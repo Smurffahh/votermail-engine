@@ -152,6 +152,9 @@ def create_portable_zip() -> Path:
                 rel_path = file_full.relative_to(DIST_DIR)
                 zf.write(file_full, arcname=str(rel_path))
 
+    if not zip_path.exists() or zip_path.stat().st_size == 0:
+        raise RuntimeError(f"Gagal membuat file ZIP distribusi: {zip_path} tidak ditemukan atau 0 byte.")
+
     size_mb = zip_path.stat().st_size / (1024 * 1024)
     print(f"[✓] Paket portabel berhasil dirakit: {zip_path.name} ({size_mb:.2f} MB)")
     return zip_path

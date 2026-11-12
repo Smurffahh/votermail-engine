@@ -5,11 +5,16 @@ __author__ = "Danang Satria"
 
 import argparse
 from datetime import date
+import os
 from pathlib import Path
 import re
 import sys
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+BASE_DIR = PROJECT_ROOT
 VERSION_FILE = BASE_DIR / "app" / "config" / "version.py"
 README_FILE = BASE_DIR / "README.md"
 

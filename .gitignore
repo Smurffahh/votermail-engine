@@ -49,6 +49,7 @@ Desktop.ini
 venv/
 env/
 .env*
+.pytest_cache/
 
 # PyInstaller Build Artifacts & Distribution Packages
 build/
