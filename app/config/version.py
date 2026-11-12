@@ -39,6 +39,12 @@ FEATURE_REGISTRY: list[dict[str, str]] = [
         "title": "Auto-Dependency Installer & Author Credits",
         "description": 'Penambahan First-Run Auto-Dependency Installer, Sistem Credit "Danang Satria" & About Modal, serta Dynamic Feature Versioning.',
     },
+    {
+        "version": "1.5.0",
+        "date": "2026-11-12",
+        "title": "Paket Portabel .EXE & GitHub Actions Auto-Release",
+        "description": "Penambahan Paket Distribusi Portabel Windows (.EXE) via PyInstaller (--onedir) & Otomasi CI/CD GitHub Actions Auto-Release.",
+    },
 ]
 
 def get_current_version() -> str:

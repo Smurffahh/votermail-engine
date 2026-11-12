@@ -3,11 +3,73 @@
 
 __author__ = "Danang Satria"
 
+import functools
 import os
 from pathlib import Path
 import shutil
 import unittest
 from pypdf import PdfReader
+
+@functools.lru_cache(maxsize=1)
+def is_ms_word_installed() -> bool:
+    try:
+        import win32com.client
+        import pythoncom
+        pythoncom.CoInitialize()
+        w = win32com.client.DispatchEx("Word.Application")
+        w.Visible = False
+        w.Quit()
+        pythoncom.CoUninitialize()
+        return True
+    except Exception:
+        return False
+
+def create_synthetic_test_pdf(file_path: str, pages_text: list[str]) -> str:
+    page_count = len(pages_text)
+    page_ids = [3 + i * 2 for i in range(page_count)]
+    content_ids = [4 + i * 2 for i in range(page_count)]
+    font_id = 3 + page_count * 2
+
+    lines = ['%PDF-1.4']
+    offsets = {}
+
+    def add_obj(num, content):
+        offsets[num] = sum(len(line.encode('latin1')) + 1 for line in lines)
+        lines.append(f'{num} 0 obj')
+        lines.append(content)
+        lines.append('endobj')
+
+    kids_str = ' '.join(f'{pid} 0 R' for pid in page_ids)
+    add_obj(1, '<</Type /Catalog /Pages 2 0 R>>')
+    add_obj(2, f'<</Type /Pages /Kids [{kids_str}] /Count {page_count}>>')
+
+    for i, text in enumerate(pages_text):
+        pid = page_ids[i]
+        cid = content_ids[i]
+        stream_data = f'BT /F1 12 Tf 50 700 Td ({text}) Tj ET\n'
+        slen = len(stream_data.encode('latin1'))
+        add_obj(pid, f'<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents {cid} 0 R /Resources <</Font <</F1 {font_id} 0 R>>>>>>')
+        add_obj(cid, f'<</Length {slen}>>\nstream\n{stream_data}endstream')
+
+    add_obj(font_id, '<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>')
+
+    xref_offset = sum(len(line.encode('latin1')) + 1 for line in lines)
+    total_objs = font_id + 1
+    lines.append('xref')
+    lines.append(f'0 {total_objs}')
+    lines.append('0000000000 65535 f ')
+    for i in range(1, total_objs):
+        lines.append(f'{offsets[i]:010d} 00000 n ')
+    lines.append('trailer')
+    lines.append(f'<</Size {total_objs} /Root 1 0 R>>')
+    lines.append('startxref')
+    lines.append(f'{xref_offset}')
+    lines.append('%%EOF')
+
+    data = '\n'.join(lines).encode('latin1')
+    with open(file_path, 'wb') as f:
+        f.write(data)
+    return file_path
 
 from app.config.settings import TEMPLATES_DIR, DATA_DIR, TEMP_DIR
 from app.core.excel_scanner import (
@@ -159,10 +221,27 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(res.detected_fields_slot1, expected_fields)
         self.assertEqual(res.detected_fields_slot2, expected_fields)
 
+    def test_05b_word_checker_on_sample_dummy_docx(self) -> None:
+        sample_docx = TEMPLATES_DIR / "SAMPLE_SURAT_DUMMY.docx"
+        self.assertTrue(sample_docx.exists())
+
+        res = check_and_prepare_word_template(str(sample_docx), work_dir=self.test_dir)
+        self.assertTrue(res.is_valid)
+        self.assertEqual(res.status_badge, "Siap Mailing")
+        self.assertTrue(os.path.exists(res.prepared_docx_path))
+
+        expected_fields = ["Alamat", "Laki-laki/Perempuan", "Nama Pemilih", "Nomor", "Umur"]
+        self.assertEqual(res.detected_fields_slot1, expected_fields)
+        self.assertEqual(res.detected_fields_slot2, expected_fields)
+
     def test_06_mail_merger_pairwise_and_odd_voters_via_word(self) -> None:
+        if not is_ms_word_installed():
+            self.skipTest("Microsoft Word COM tidak terinstal di lingkungan ini (CI runner)")
+
         tpl_path = self.ready_docx_file if os.path.exists(self.ready_docx_file) else os.path.join(self.test_dir, "template_ready.docx")
         if not os.path.exists(tpl_path):
-            res = check_and_prepare_word_template(self.real_doc_file, work_dir=self.test_dir)
+            sample_docx = str(TEMPLATES_DIR / "SAMPLE_SURAT_DUMMY.docx")
+            res = check_and_prepare_word_template(sample_docx, work_dir=self.test_dir)
             tpl_path = res.prepared_docx_path
 
         voters = [
@@ -195,9 +274,13 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertIn("TARSUN", p2_text)
 
     def test_07_word_preview_generation(self) -> None:
+        if not is_ms_word_installed():
+            self.skipTest("Microsoft Word COM tidak terinstal di lingkungan ini (CI runner)")
+
         tpl_path = self.ready_docx_file if os.path.exists(self.ready_docx_file) else os.path.join(self.test_dir, "template_ready.docx")
         if not os.path.exists(tpl_path):
-            res = check_and_prepare_word_template(self.real_doc_file, work_dir=self.test_dir)
+            sample_docx = str(TEMPLATES_DIR / "SAMPLE_SURAT_DUMMY.docx")
+            res = check_and_prepare_word_template(sample_docx, work_dir=self.test_dir)
             tpl_path = res.prepared_docx_path
 
         out_preview = os.path.join(self.test_dir, "test_word_preview.pdf")
@@ -212,23 +295,28 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertIn("SURAT PEMBERITAHUAN UNTUK MEMBERIKAN SUARA", text)
 
     def test_08_pdf_verifier_success_and_audit_export(self) -> None:
-        tpl_path = self.ready_docx_file if os.path.exists(self.ready_docx_file) else os.path.join(self.test_dir, "template_ready.docx")
-        if not os.path.exists(tpl_path):
-            res = check_and_prepare_word_template(self.real_doc_file, work_dir=self.test_dir)
-            tpl_path = res.prepared_docx_path
-
         voters = [
             VoterData(nomor="1", nama="ALIF MUBAROK", jenis_kelamin="Laki-laki", umur="21 Tahun", alamat="KARANGJENGKOL, RT 001 / RW 001", sheet_name="KADUS 1", wilayah="KADUS 1", row_index=12),
             VoterData(nomor="2", nama="HAYATUNISA", jenis_kelamin="Perempuan", umur="19 Tahun", alamat="KARANGJENGKOL, RT 001 / RW 001", sheet_name="KADUS 1", wilayah="KADUS 1", row_index=13),
         ]
         out_pdf = os.path.join(self.test_dir, "test_word_verify_success.pdf")
-        merge_voters_to_pdf_via_word_com(
-            template_docx_path=tpl_path,
-            voters=voters,
-            sheet_name="KADUS 1",
-            wilayah_name="KADUS 1",
-            output_pdf_path=out_pdf,
-        )
+
+        if is_ms_word_installed():
+            tpl_path = self.ready_docx_file if os.path.exists(self.ready_docx_file) else os.path.join(self.test_dir, "template_ready.docx")
+            if not os.path.exists(tpl_path):
+                sample_docx = str(TEMPLATES_DIR / "SAMPLE_SURAT_DUMMY.docx")
+                res = check_and_prepare_word_template(sample_docx, work_dir=self.test_dir)
+                tpl_path = res.prepared_docx_path
+
+            merge_voters_to_pdf_via_word_com(
+                template_docx_path=tpl_path,
+                voters=voters,
+                sheet_name="KADUS 1",
+                wilayah_name="KADUS 1",
+                output_pdf_path=out_pdf,
+            )
+        else:
+            create_synthetic_test_pdf(out_pdf, ["ALIF MUBAROK HAYATUNISA Laki-laki Perempuan 21 Tahun 19 Tahun KARANGJENGKOL, RT 001 / RW 001"])
 
         res = verify_kadus_pdf(out_pdf, "KADUS 1", voters)
         self.assertTrue(res.is_valid)
@@ -242,22 +330,27 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertTrue(os.path.exists(excel_report))
 
     def test_09_pdf_verifier_discrepancy_detection(self) -> None:
-        tpl_path = self.ready_docx_file if os.path.exists(self.ready_docx_file) else os.path.join(self.test_dir, "template_ready.docx")
-        if not os.path.exists(tpl_path):
-            res = check_and_prepare_word_template(self.real_doc_file, work_dir=self.test_dir)
-            tpl_path = res.prepared_docx_path
-
         voters_actual = [
             VoterData(nomor="1", nama="ALIF MUBAROK", jenis_kelamin="Laki-laki", umur="21 Tahun", alamat="KARANGJENGKOL", sheet_name="KADUS 1", wilayah="KADUS 1", row_index=12),
         ]
         out_pdf = os.path.join(self.test_dir, "test_verify_discrepancy.pdf")
-        merge_voters_to_pdf_via_word_com(
-            template_docx_path=tpl_path,
-            voters=voters_actual,
-            sheet_name="KADUS 1",
-            wilayah_name="KADUS 1",
-            output_pdf_path=out_pdf,
-        )
+
+        if is_ms_word_installed():
+            tpl_path = self.ready_docx_file if os.path.exists(self.ready_docx_file) else os.path.join(self.test_dir, "template_ready.docx")
+            if not os.path.exists(tpl_path):
+                sample_docx = str(TEMPLATES_DIR / "SAMPLE_SURAT_DUMMY.docx")
+                res = check_and_prepare_word_template(sample_docx, work_dir=self.test_dir)
+                tpl_path = res.prepared_docx_path
+
+            merge_voters_to_pdf_via_word_com(
+                template_docx_path=tpl_path,
+                voters=voters_actual,
+                sheet_name="KADUS 1",
+                wilayah_name="KADUS 1",
+                output_pdf_path=out_pdf,
+            )
+        else:
+            create_synthetic_test_pdf(out_pdf, ["ALIF MUBAROK Laki-laki 21 Tahun KARANGJENGKOL"])
 
         voters_tampered = [
             VoterData(nomor="1", nama="ALIF MUBAROK", jenis_kelamin="Laki-laki", umur="21 Tahun", alamat="KARANGJENGKOL", sheet_name="KADUS 1", wilayah="KADUS 1", row_index=12),
@@ -362,10 +455,10 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(__author__, "Danang Satria")
         self.assertEqual(__github_user__, "Smurffahh")
         self.assertTrue(__repository__.startswith("https://github.com/Smurffahh"))
-        self.assertEqual(__version__, "1.4.0")
-        self.assertEqual(get_current_version(), "1.4.0")
-        self.assertGreaterEqual(len(FEATURE_REGISTRY), 5)
-        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.4.0")
+        self.assertEqual(__version__, "1.5.0")
+        self.assertEqual(get_current_version(), "1.5.0")
+        self.assertGreaterEqual(len(FEATURE_REGISTRY), 6)
+        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.5.0")
 
     def test_14_dependency_bootstrapper(self) -> None:
         import main

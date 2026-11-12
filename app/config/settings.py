@@ -7,10 +7,15 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sys
 from typing import Any
 from pydantic import BaseModel, Field
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).resolve().parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
 DATA_DIR = BASE_DIR / "data"
 TEMPLATES_DIR = DATA_DIR / "templates"
 OUTPUT_DIR = DATA_DIR / "output"

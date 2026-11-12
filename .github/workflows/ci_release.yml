@@ -1,0 +1,133 @@
+name: CI/CD Test, Build, & Auto-Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test-build-and-release:
+    name: Test, Build, and Auto-Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python 3.11 (x64)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller pytest
+
+      - name: Generate Sample Data & Run Automated Tests
+        env:
+          CI: "true"
+        run: |
+          python scripts/generate_sample_data.py
+          pytest tests/test_mailmerge.py -v
+
+      - name: Extract Version & Generate Release Notes
+        id: meta
+        shell: pwsh
+        run: |
+          python -c "
+          import os
+          from pathlib import Path
+          from app.config.version import (
+              __version__,
+              __app_name__,
+              __author__,
+              __repository__,
+              FEATURE_REGISTRY,
+          )
+
+          latest = FEATURE_REGISTRY[-1]
+          highlights_text = '\n'.join([f'- {h}' for h in latest.get('highlights', [latest.get('description', '')])])
+
+          notes = f'''# {__app_name__} v{__version__} (Windows x64 Portable)
+
+          **Dikembangkan oleh:** [{__author__}]({__repository__})  
+          **Tanggal Rilis:** {latest.get('date', '')}  
+          **Fitur Utama:** {latest.get('title', '')}
+
+          ### Pembaruan & Fitur Baru:
+          {highlights_text}
+
+          ---
+
+          ### Panduan Penggunaan Lapangan (Tanpa Perlu Instal Python):
+          1. Unduh berkas `VoterMail_Engine_v{__version__}_Windows_x64_Portable.zip` pada bagian **Assets** di bawah.
+          2. Ekstrak (unzip) arsip ke folder mana pun di PC Windows Anda.
+          3. Pastikan **Microsoft Word** telah terpasang di komputer Anda.
+          4. Klik ganda `VoterMail_Engine.exe` untuk langsung menjalankan aplikasi.
+          5. Buka `PANDUAN_PANITIA.txt` di dalam folder hasil ekstrak untuk panduan langkah demi langkah.
+
+          ---
+          *Official Civic Automation Tool • MIT License*
+          '''
+
+          Path('RELEASE_NOTES.md').write_text(notes.strip(), encoding='utf-8')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write(f'version={__version__}\n')
+              f.write(f'tag_name=v{__version__}\n')
+          "
+
+      - name: Build Portable Windows EXE Package (--onedir)
+        run: |
+          python scripts/build_exe.py
+
+      - name: Upload Build Artifact to Workflow Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoterMail_Engine_v${{ steps.meta.outputs.version }}_Windows_x64_Portable
+          path: dist/VoterMail_Engine_v${{ steps.meta.outputs.version }}_Windows_x64_Portable.zip
+          retention-days: 30
+
+      - name: Check If GitHub Release Already Exists
+        id: check_release
+        shell: pwsh
+        run: |
+          $tag = "v${{ steps.meta.outputs.version }}"
+          $exists = "false"
+          try {
+            $check = gh release view $tag --repo ${{ github.repository }} 2>&1
+            if ($LASTEXITCODE -eq 0) {
+              $exists = "true"
+              Write-Host "GitHub Release $tag sudah ada. Rilis otomatis dilewati."
+            } else {
+              Write-Host "GitHub Release $tag belum ada. Mempersiapkan rilis baru..."
+            }
+          } catch {
+            $exists = "false"
+          }
+          "release_exists=$exists" >> $env:GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-Publish GitHub Release
+        if: steps.check_release.outputs.release_exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag_name }}
+          name: VoterMail Engine v${{ steps.meta.outputs.version }} (Windows x64 Portable .EXE)
+          body_path: RELEASE_NOTES.md
+          files: dist/VoterMail_Engine_v${{ steps.meta.outputs.version }}_Windows_x64_Portable.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

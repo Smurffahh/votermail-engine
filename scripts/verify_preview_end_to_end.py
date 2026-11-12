@@ -19,7 +19,24 @@ from app.core.excel_scanner import scan_and_validate_excel
 from app.core.mail_merger import generate_preview_via_word
 from app.core.security import to_win_abs_path
 
+def is_ms_word_installed() -> bool:
+    try:
+        import win32com.client
+        import pythoncom
+        pythoncom.CoInitialize()
+        w = win32com.client.DispatchEx("Word.Application")
+        w.Visible = False
+        w.Quit()
+        pythoncom.CoUninitialize()
+        return True
+    except Exception:
+        return False
+
 def main():
+    if not is_ms_word_installed():
+        print("[SKIP] Microsoft Word COM tidak terinstal di lingkungan ini. Melewati pengujian Word COM.")
+        return
+
     word_file = get_default_word_path()
     excel_file = get_default_excel_path()
     preview_pdf = str(OUTPUT_DIR / "Pratinjau_Surat_Word_1_Halaman.pdf")

@@ -4,6 +4,7 @@
 __author__ = "Danang Satria"
 
 import importlib.util
+import multiprocessing
 import os
 import subprocess
 import sys
@@ -114,6 +115,8 @@ def install_missing_packages_with_gui(missing: dict[str, str]) -> bool:
     return True
 
 def ensure_dependencies() -> None:
+    if getattr(sys, "frozen", False):
+        return
     missing = get_missing_packages()
     if not missing:
         return
@@ -129,4 +132,5 @@ def main() -> None:
     app.mainloop()
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     main()
