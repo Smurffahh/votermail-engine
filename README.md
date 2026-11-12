@@ -12,6 +12,9 @@ Aplikasi desktop berbasis Python untuk otomatisasi mail-merge ribuan Surat Pembe
 - **Non-Destructive MS Word COM Mail-Merge**  
   Mengotomasi dokumen Microsoft Word asli (`.doc`, `.docx`, `.rtf`) melalui Windows COM Automation (`win32com.client`) dengan format layout 2-Up (2 surat pemilih per lembar F4/A4). Mempertahankan seluruh elemen vector shape, garis pemisah horizontal, dan pita sudut *PANITIA PEMILIHAN* tanpa merusak struktur XML dokumen.
 
+- **Live File Change Watcher & Structural Diff Analyzer**  
+  Mendeteksi otomatis setiap perubahan eksternal pada file Word atau Excel DPT (via hashing SHA-256 dan timestamp file). Menampilkan badge status Amber reaktif, menginvalidasi cache usang, serta mencetak laporan perbandingan perubahan (jadwal acara, selisih pemilih per sheet, penambahan/penghapusan kolom) secara mendalam.
+
 - **Toggleable PDF Verification Engine (On/Off)**  
   Mesin audit pasca-cetak berbasis `pypdf` yang memverifikasi kesesuaian jumlah halaman PDF per Kadus ($\lceil N / 2 \rceil$) serta menguji keterbacaan teks nama pemilih dan nomor urut DPT. Hasil audit diekspor langsung ke spreadsheet laporan verifikasi.
 
@@ -86,10 +89,10 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-### 4. Buat Data DPT Simulasi (Untuk Pengujian)
-Jika belum memiliki file DPT resmi, buat data simulasi (3 Kadus @ 20 pemilih) dengan menjalankan:
+### 4. Buat Data Simulasi Tokoh Terkenal Indonesia (Untuk Pengujian)
+Jika belum memiliki file template Word atau DPT resmi, buat data simulasi (5 Sheet Kadus @ 25 publik figur Indonesia dan template surat dummy 2-Up) dengan menjalankan:
 ```powershell
-python -c "from scripts.generate_sample_data import create_dpt_karangjengkol_sample; create_dpt_karangjengkol_sample('data/templates/SAMPLE_DPT_DUMMY.xlsx', voters_per_sheet=20)"
+python scripts/generate_sample_data.py
 ```
 
 ### 5. Jalankan Aplikasi

@@ -5,13 +5,24 @@ from .security import (
     safe_delete_file,
     clean_directory,
 )
-from .word_preparer import WordCheckResult, check_and_prepare_word_template
+from .word_preparer import (
+    WordCheckResult,
+    WordSnapshot,
+    check_and_prepare_word_template,
+    compute_word_snapshot,
+    analyze_word_diff,
+    get_file_fingerprint,
+)
 from .excel_scanner import (
     VoterData,
     ScanIssue,
     SheetScanSummary,
     PreFlightScanResult,
+    ExcelSnapshot,
     scan_and_validate_excel,
+    compute_excel_snapshot,
+    analyze_excel_diff,
+    get_excel_file_fingerprint,
     transform_gender,
     transform_age,
     transform_address,

@@ -10,6 +10,7 @@ config.json
 data/templates/*
 !data/templates/.gitkeep
 !data/templates/SAMPLE_DPT_DUMMY.xlsx
+!data/templates/SAMPLE_SURAT_DUMMY.docx
 
 # Generated Outputs & Audit Reports
 data/output/*

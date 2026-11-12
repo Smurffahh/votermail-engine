@@ -97,9 +97,9 @@ class TestMailMergeApp(unittest.TestCase):
         res = scan_and_validate_excel(self.sample_dpt_file, address_mode="lengkap")
 
         self.assertTrue(res.is_valid)
-        self.assertEqual(res.total_sheets, 3)
-        self.assertEqual(res.total_voters, 75)
-        self.assertEqual(res.total_pages, 39)
+        self.assertEqual(res.total_sheets, 5)
+        self.assertEqual(res.total_voters, 125)
+        self.assertEqual(res.total_pages, 65)
         self.assertEqual(len(res.all_issues), 0)
 
         for s in res.sheet_summaries:
@@ -271,6 +271,77 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertIn(cfg.theme_mode, ("Dark", "Light"))
         ok = save_app_config(cfg)
         self.assertTrue(ok)
+
+    def test_11_word_diff_and_snapshots(self) -> None:
+        from app.core.word_preparer import (
+            WordSnapshot,
+            compute_word_snapshot,
+            analyze_word_diff,
+        )
+        sample_word = TEMPLATES_DIR / "SAMPLE_SURAT_DUMMY.docx"
+        self.assertTrue(sample_word.exists())
+
+        snap1 = compute_word_snapshot(
+            str(sample_word),
+            str(sample_word),
+            is_valid=True,
+            detected_slot1=["Nomor", "Nama Pemilih"],
+            detected_slot2=["Nomor", "Nama Pemilih"],
+        )
+        self.assertEqual(snap1.file_path, str(sample_word))
+        self.assertTrue(snap1.is_valid)
+        self.assertGreater(snap1.size, 0)
+
+        diff1 = analyze_word_diff(None, snap1)
+        self.assertTrue(any("Snapshot awal" in line for line in diff1))
+
+        snap2 = WordSnapshot(
+            file_path=snap1.file_path,
+            sha256="fake_sha",
+            mtime=snap1.mtime + 10,
+            size=snap1.size + 100,
+            fields_slot1=["Nomor", "Nama Pemilih", "Umur"],
+            fields_slot2=snap1.fields_slot2,
+            schedule_summary={"hari": "Jumat, 11 Desember 2026"},
+            ketua="RATNO",
+            paragraphs_count=snap1.paragraphs_count + 1,
+            is_valid=True,
+        )
+        diff2 = analyze_word_diff(snap1, snap2)
+        self.assertTrue(any("Hari/Tanggal" in line for line in diff2))
+        self.assertTrue(any("Slot 1" in line for line in diff2))
+
+    def test_12_excel_diff_and_snapshots(self) -> None:
+        from app.core.excel_scanner import (
+            ExcelSnapshot,
+            compute_excel_snapshot,
+            analyze_excel_diff,
+        )
+        sample_excel = TEMPLATES_DIR / "SAMPLE_DPT_DUMMY.xlsx"
+        self.assertTrue(sample_excel.exists())
+
+        scan_res = scan_and_validate_excel(str(sample_excel))
+        snap1 = compute_excel_snapshot(scan_res, str(sample_excel))
+        self.assertEqual(snap1.total_voters, 125)
+        self.assertEqual(snap1.total_sheets, 5)
+
+        diff1 = analyze_excel_diff(None, snap1)
+        self.assertTrue(any("Snapshot awal" in line for line in diff1))
+
+        snap2 = ExcelSnapshot(
+            file_path=snap1.file_path,
+            sha256="fake_sha",
+            mtime=snap1.mtime + 10,
+            size=snap1.size + 500,
+            sheets_summary={"KADUS 1": 28, "KADUS 2": 25, "KADUS 6": 10},
+            total_voters=138,
+            total_sheets=6,
+            invalid_rows_count=0,
+            is_valid=True,
+        )
+        diff2 = analyze_excel_diff(snap1, snap2)
+        self.assertTrue(any("KADUS 1" in line and "+3" in line for line in diff2))
+        self.assertTrue(any("KADUS 6" in line for line in diff2))
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,3 +1,6 @@
+from dataclasses import dataclass, field
+from datetime import datetime
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -11,6 +14,128 @@ import win32com.client
 
 from app.config.settings import TEMP_DIR
 from app.core.security import to_win_abs_path
+
+@dataclass
+class WordSnapshot:
+    file_path: str
+    sha256: str
+    mtime: float
+    size: int
+    fields_slot1: list[str]
+    fields_slot2: list[str]
+    schedule_summary: dict[str, str]
+    ketua: str
+    paragraphs_count: int
+    is_valid: bool = True
+
+def get_file_fingerprint(file_path: str) -> tuple[str, float, int]:
+    p = Path(file_path)
+    if not p.exists():
+        return ("", 0.0, 0)
+    mtime = p.stat().st_mtime
+    size = p.stat().st_size
+    hasher = hashlib.sha256()
+    with open(p, "rb") as f:
+        while chunk := f.read(65536):
+            hasher.update(chunk)
+    return (hasher.hexdigest(), mtime, size)
+
+def _extract_val_from_line(line_txt: str, prefix: str) -> str:
+    parts = line_txt.split("\t")
+    for p in parts:
+        if ":" in p and not p.lower().startswith(prefix.lower()):
+            v = p.lstrip(":").strip()
+            if v and not v.startswith("..."):
+                return v
+        elif ":" in p:
+            v = p.split(":", 1)[1].strip()
+            if v and not v.startswith("..."):
+                return v
+    return ""
+
+def compute_word_snapshot(
+    docx_path: str,
+    original_file_path: str,
+    is_valid: bool = True,
+    detected_slot1: list[str] | None = None,
+    detected_slot2: list[str] | None = None,
+) -> WordSnapshot:
+    sha256, mtime, size = get_file_fingerprint(original_file_path)
+    schedule: dict[str, str] = {}
+    ketua = ""
+    paragraphs_count = 0
+
+    if os.path.exists(docx_path):
+        try:
+            doc = docx.Document(docx_path)
+            paragraphs = list(iter_all_paragraphs(doc))
+            paragraphs_count = len(paragraphs)
+            for p in paragraphs:
+                txt = p.text.strip()
+                tl = txt.lower()
+                if "hari, tanggal" in tl and "hari" not in schedule:
+                    schedule["hari"] = _extract_val_from_line(txt, "Hari, tanggal")
+                elif "tempat" in tl and ":" in txt and "tempat" not in schedule:
+                    schedule["tempat"] = _extract_val_from_line(txt, "Tempat")
+                elif "waktu" in tl and ":" in txt and "waktu" not in schedule:
+                    schedule["waktu"] = _extract_val_from_line(txt, "Waktu")
+                elif "ratno" in tl:
+                    ketua = "RATNO"
+        except Exception:
+            pass
+
+    return WordSnapshot(
+        file_path=original_file_path,
+        sha256=sha256,
+        mtime=mtime,
+        size=size,
+        fields_slot1=sorted(list(set(detected_slot1 or []))),
+        fields_slot2=sorted(list(set(detected_slot2 or []))),
+        schedule_summary=schedule,
+        ketua=ketua,
+        paragraphs_count=paragraphs_count,
+        is_valid=is_valid,
+    )
+
+def analyze_word_diff(old_snap: WordSnapshot | None, new_snap: WordSnapshot) -> list[str]:
+    lines: list[str] = []
+    file_name = os.path.basename(new_snap.file_path)
+    mod_time_str = datetime.fromtimestamp(new_snap.mtime).strftime("%d/%m/%Y %H:%M:%S")
+    lines.append(f"[DIFF WORD] File Word terdeteksi diperbarui: {file_name}")
+    lines.append(f"[DIFF WORD] Waktu Simpan: {mod_time_str} | Ukuran: {new_snap.size:,} bytes")
+
+    if old_snap is None:
+        lines.append("[DIFF WORD] Snapshot awal template Word berhasil dimuat.")
+        if new_snap.schedule_summary:
+            lines.append(f"[DIFF WORD] Jadwal Acara: {new_snap.schedule_summary.get('hari', '-')} | Tempat: {new_snap.schedule_summary.get('tempat', '-')}")
+        lines.append(f"[DIFF WORD] Field Slot 1: {', '.join(new_snap.fields_slot1) or 'Kosong'}")
+        lines.append(f"[DIFF WORD] Field Slot 2: {', '.join(new_snap.fields_slot2) or 'Kosong'}")
+        return lines
+
+    schedule_changed = False
+    for k, label in [("hari", "Hari/Tanggal"), ("tempat", "Tempat"), ("waktu", "Waktu")]:
+        old_v = old_snap.schedule_summary.get(k, "")
+        new_v = new_snap.schedule_summary.get(k, "")
+        if old_v != new_v:
+            schedule_changed = True
+            lines.append(f"[DIFF WORD] Perubahan {label}: '{old_v}' -> '{new_v}'")
+
+    if not schedule_changed:
+        lines.append("[DIFF WORD] Teks jadwal acara (Hari, Tempat, Waktu) tidak mengalami perubahan.")
+
+    if old_snap.fields_slot1 != new_snap.fields_slot1:
+        lines.append(f"[DIFF WORD] Perubahan Field Slot 1: {old_snap.fields_slot1} -> {new_snap.fields_slot1}")
+    if old_snap.fields_slot2 != new_snap.fields_slot2:
+        lines.append(f"[DIFF WORD] Perubahan Field Slot 2: {old_snap.fields_slot2} -> {new_snap.fields_slot2}")
+
+    if old_snap.paragraphs_count != new_snap.paragraphs_count:
+        p_diff = new_snap.paragraphs_count - old_snap.paragraphs_count
+        p_sign = f"+{p_diff}" if p_diff > 0 else str(p_diff)
+        lines.append(f"[DIFF WORD] Jumlah Paragraf: {old_snap.paragraphs_count} -> {new_snap.paragraphs_count} ({p_sign})")
+
+    status_str = "SIAP MAILING" if new_snap.is_valid else "PERLU PERBAIKAN"
+    lines.append(f"[DIFF WORD] Status Validasi Template: {status_str}")
+    return lines
 
 class WordCheckResult(BaseModel):
     is_valid: bool = True
@@ -206,6 +331,45 @@ def check_and_prepare_word_template(
     tag_counts: dict[str, int] = {}
     schedule_counts: dict[str, int] = {}
 
+    # Pre-scan Slot 1 to dynamically extract schedule values and column 2 text
+    extracted_schedule: dict[str, str] = {
+        "hari": "Kamis, 10 Desember 2026",
+        "tempat": "Lapangan Desa Karangjengkol",
+        "waktu": "08.00 WIB s/d selesai",
+        "col2_hari": "Hari ................................................... tanggal ................................................................",
+        "col2_tempat": "........................................................................................................................................",
+        "col2_waktu": "Jam 08.00 sampai dengan 14.00 WIB",
+    }
+    seen_schedule_keys: set[str] = set()
+
+    for p in iter_all_paragraphs(doc):
+        t = p.text.strip()
+        tl = t.lower()
+        if "hari, tanggal" in tl and "hari" not in seen_schedule_keys:
+            seen_schedule_keys.add("hari")
+            val = _extract_val_from_line(t, "Hari, tanggal")
+            if val:
+                extracted_schedule["hari"] = val
+            parts = t.split("\t")
+            if len(parts) > 2 and parts[2].strip():
+                extracted_schedule["col2_hari"] = parts[2].strip()
+        elif "tempat" in tl and ":" in t and "tempat" not in seen_schedule_keys:
+            seen_schedule_keys.add("tempat")
+            val = _extract_val_from_line(t, "Tempat")
+            if val:
+                extracted_schedule["tempat"] = val
+            parts = t.split("\t")
+            if len(parts) > 2 and parts[2].strip():
+                extracted_schedule["col2_tempat"] = parts[2].strip()
+        elif "waktu" in tl and ":" in t and "waktu" not in seen_schedule_keys:
+            seen_schedule_keys.add("waktu")
+            val = _extract_val_from_line(t, "Waktu")
+            if val:
+                extracted_schedule["waktu"] = val
+            parts = t.split("\t")
+            if len(parts) > 2 and parts[2].strip():
+                extracted_schedule["col2_waktu"] = parts[2].strip()
+
     for p in iter_all_paragraphs(doc):
         txt = p.text
         lower = txt.lower()
@@ -254,26 +418,32 @@ def check_and_prepare_word_template(
             c = schedule_counts.get("hari", 0) + 1
             schedule_counts["hari"] = c
             if c == 2:
-                set_paragraph_text_preserving_drawings(
-                    p,
-                    "Hari, tanggal\t: Kamis, 10 Desember 2026\tHari ................................................... tanggal ................................................................"
-                )
+                slot2_val = _extract_val_from_line(txt, "Hari, tanggal")
+                if not slot2_val:
+                    set_paragraph_text_preserving_drawings(
+                        p,
+                        f"Hari, tanggal\t: {extracted_schedule['hari']}\t{extracted_schedule['col2_hari']}"
+                    )
         elif "tempat" in lower and ":" in txt:
             c = schedule_counts.get("tempat", 0) + 1
             schedule_counts["tempat"] = c
             if c == 2:
-                set_paragraph_text_preserving_drawings(
-                    p,
-                    "Tempat\t: Lapangan Desa Karangjengkol\t........................................................................................................................................"
-                )
+                slot2_val = _extract_val_from_line(txt, "Tempat")
+                if not slot2_val:
+                    set_paragraph_text_preserving_drawings(
+                        p,
+                        f"Tempat\t: {extracted_schedule['tempat']}\t{extracted_schedule['col2_tempat']}"
+                    )
         elif "waktu" in lower and ":" in txt:
             c = schedule_counts.get("waktu", 0) + 1
             schedule_counts["waktu"] = c
             if c == 2:
-                set_paragraph_text_preserving_drawings(
-                    p,
-                    "Waktu\t: 08.00 WIB s/d selesai\tJam 08.00 sampai dengan 14.00 WIB"
-                )
+                slot2_val = _extract_val_from_line(txt, "Waktu")
+                if not slot2_val:
+                    set_paragraph_text_preserving_drawings(
+                        p,
+                        f"Waktu\t: {extracted_schedule['waktu']}\t{extracted_schedule['col2_waktu']}"
+                    )
 
     doc.save(result.prepared_docx_path)
 

@@ -1,9 +1,103 @@
+from dataclasses import dataclass, field
+from datetime import datetime
+import hashlib
 import math
 import os
+from pathlib import Path
 import re
 from typing import Any
 import pandas as pd
 from pydantic import BaseModel, Field
+
+@dataclass
+class ExcelSnapshot:
+    file_path: str
+    sha256: str
+    mtime: float
+    size: int
+    sheets_summary: dict[str, int]
+    total_voters: int
+    total_sheets: int
+    invalid_rows_count: int
+    is_valid: bool = True
+
+def get_excel_file_fingerprint(file_path: str) -> tuple[str, float, int]:
+    p = Path(file_path)
+    if not p.exists():
+        return ("", 0.0, 0)
+    mtime = p.stat().st_mtime
+    size = p.stat().st_size
+    hasher = hashlib.sha256()
+    with open(p, "rb") as f:
+        while chunk := f.read(65536):
+            hasher.update(chunk)
+    return (hasher.hexdigest(), mtime, size)
+
+def compute_excel_snapshot(scan_res: "PreFlightScanResult", file_path: str) -> ExcelSnapshot:
+    sha256, mtime, size = get_excel_file_fingerprint(file_path)
+    sheets_summary = {
+        s.sheet_name: s.total_voters
+        for s in scan_res.sheet_summaries
+        if s.is_voter_sheet
+    }
+    return ExcelSnapshot(
+        file_path=file_path,
+        sha256=sha256,
+        mtime=mtime,
+        size=size,
+        sheets_summary=sheets_summary,
+        total_voters=scan_res.total_voters,
+        total_sheets=scan_res.total_sheets,
+        invalid_rows_count=len(scan_res.all_issues),
+        is_valid=scan_res.is_valid,
+    )
+
+def analyze_excel_diff(old_snap: ExcelSnapshot | None, new_snap: ExcelSnapshot) -> list[str]:
+    lines: list[str] = []
+    file_name = os.path.basename(new_snap.file_path)
+    mod_time_str = datetime.fromtimestamp(new_snap.mtime).strftime("%d/%m/%Y %H:%M:%S")
+    lines.append(f"[DIFF EXCEL] File Excel terdeteksi diperbarui: {file_name}")
+    lines.append(f"[DIFF EXCEL] Waktu Simpan: {mod_time_str} | Ukuran: {new_snap.size:,} bytes")
+
+    if old_snap is None:
+        lines.append("[DIFF EXCEL] Snapshot awal data Excel DPT berhasil dibuat.")
+        lines.append(f"[DIFF EXCEL] Total Pemilih: {new_snap.total_voters:,} orang di {new_snap.total_sheets} Sheet Kadus")
+        for s_name, count in new_snap.sheets_summary.items():
+            lines.append(f" - {s_name}: {count:,} Pemilih")
+        return lines
+
+    old_sheets = set(old_snap.sheets_summary.keys())
+    new_sheets = set(new_snap.sheets_summary.keys())
+    added = new_sheets - old_sheets
+    removed = old_sheets - new_sheets
+    if added:
+        lines.append(f"[DIFF EXCEL] Sheet Kadus Baru: {', '.join(sorted(added))}")
+    if removed:
+        lines.append(f"[DIFF EXCEL] Sheet Kadus Dihapus: {', '.join(sorted(removed))}")
+
+    count_changed = False
+    for s_name in sorted(new_sheets.intersection(old_sheets)):
+        old_c = old_snap.sheets_summary[s_name]
+        new_c = new_snap.sheets_summary[s_name]
+        if old_c != new_c:
+            count_changed = True
+            diff = new_c - old_c
+            diff_sign = f"+{diff}" if diff > 0 else str(diff)
+            lines.append(f"[DIFF EXCEL] {s_name}: {old_c:,} -> {new_c:,} Pemilih ({diff_sign} pemilih)")
+
+    if old_snap.total_voters != new_snap.total_voters:
+        diff_total = new_snap.total_voters - old_snap.total_voters
+        diff_total_sign = f"+{diff_total}" if diff_total > 0 else str(diff_total)
+        lines.append(f"[DIFF EXCEL] Total Pemilih: {old_snap.total_voters:,} -> {new_snap.total_voters:,} ({diff_total_sign} pemilih)")
+    elif not count_changed and not added and not removed:
+        lines.append("[DIFF EXCEL] Jumlah pemilih pada tiap Sheet Kadus tetap sama.")
+
+    if old_snap.invalid_rows_count != new_snap.invalid_rows_count:
+        lines.append(f"[DIFF EXCEL] Baris Bermasalah: {old_snap.invalid_rows_count} -> {new_snap.invalid_rows_count}")
+
+    status_str = "VALID (SIAP MAILING)" if new_snap.is_valid else "PERLU PERBAIKAN"
+    lines.append(f"[DIFF EXCEL] Status Validasi Excel: {status_str}")
+    return lines
 
 class VoterData(BaseModel):
     nomor: str

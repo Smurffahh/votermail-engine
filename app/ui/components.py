@@ -51,7 +51,7 @@ class StatusBadge(ctk.CTkFrame):
         self,
         master: any,
         text: str,
-        status: Literal["ready", "process", "error", "neutral"],
+        status: Literal["ready", "process", "error", "neutral", "amber"],
         theme: ThemeTokens,
         **kwargs,
     ) -> None:
@@ -70,11 +70,13 @@ class StatusBadge(ctk.CTkFrame):
         self.label.pack(padx=8, pady=3)
         self.set_status(text, status)
 
-    def set_status(self, text: str, status: Literal["ready", "process", "error", "neutral"]) -> None:
+    def set_status(self, text: str, status: Literal["ready", "process", "error", "neutral", "amber"]) -> None:
         if status == "ready":
             bg, fg = self.theme.badge_ready_bg, self.theme.badge_ready_text
         elif status == "process":
             bg, fg = self.theme.badge_process_bg, self.theme.badge_process_text
+        elif status == "amber":
+            bg, fg = self.theme.badge_amber_bg, self.theme.badge_amber_text
         elif status == "error":
             bg, fg = self.theme.badge_error_bg, self.theme.badge_error_text
         else:

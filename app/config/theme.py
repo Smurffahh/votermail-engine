@@ -29,6 +29,8 @@ class ThemeTokens:
     badge_process_text: str
     badge_error_bg: str
     badge_error_text: str
+    badge_amber_bg: str
+    badge_amber_text: str
     badge_neutral_bg: str
     badge_neutral_text: str
     font_family_main: str = "Segoe UI"
@@ -61,6 +63,8 @@ DARK_THEME = ThemeTokens(
     badge_process_text="#FBBF24",
     badge_error_bg="#7F1D1D",
     badge_error_text="#F87171",
+    badge_amber_bg="#F59E0B",
+    badge_amber_text="#78350F",
     badge_neutral_bg="#1E293B",
     badge_neutral_text="#94A3B8",
 )
@@ -92,6 +96,8 @@ LIGHT_THEME = ThemeTokens(
     badge_process_text="#B45309",
     badge_error_bg="#FEE2E2",
     badge_error_text="#B91C1C",
+    badge_amber_bg="#F59E0B",
+    badge_amber_text="#78350F",
     badge_neutral_bg="#E2E8F0",
     badge_neutral_text="#475569",
 )

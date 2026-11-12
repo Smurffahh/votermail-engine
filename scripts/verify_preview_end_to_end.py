@@ -3,16 +3,21 @@ from pathlib import Path
 import pypdf
 import fitz
 
+from app.config.settings import (
+    BASE_DIR,
+    OUTPUT_DIR,
+    get_default_word_path,
+    get_default_excel_path,
+)
 from app.core.word_preparer import check_and_prepare_word_template
 from app.core.excel_scanner import scan_and_validate_excel
 from app.core.mail_merger import generate_preview_via_word
 from app.core.security import to_win_abs_path
 
 def main():
-    word_file = r"E:\Backup coding\mailmerge-pemilih-app\data\templates\SURAT PANGGILAN.doc"
-    excel_file = r"E:\Backup coding\mailmerge-pemilih-app\data\templates\DAFTAR PEMILIH TETAP DESA KARANGJENGKOL.xlsx"
-    out_dir = r"E:\Backup coding\mailmerge-pemilih-app\data\output"
-    preview_pdf = os.path.join(out_dir, "Pratinjau_Surat_Word_1_Halaman.pdf")
+    word_file = get_default_word_path()
+    excel_file = get_default_excel_path()
+    preview_pdf = str(OUTPUT_DIR / "Pratinjau_Surat_Word_1_Halaman.pdf")
 
     print("[1] Cek & Siapkan Template Word...")
     word_res = check_and_prepare_word_template(word_file)
@@ -80,7 +85,7 @@ def main():
     # Render PNG for visual proof
     doc_fitz = fitz.open(final_pdf)
     pix = doc_fitz[0].get_pixmap(dpi=150)
-    png_out = r"E:\Backup coding\mailmerge-pemilih-app\data\output\Pratinjau_Surat_Word_1_Halaman_Verifikasi.png"
+    png_out = str(OUTPUT_DIR / "Pratinjau_Surat_Word_1_Halaman_Verifikasi.png")
     pix.save(png_out)
     print(f"\n[5] Rendered visual preview image: {png_out}")
     print("All end-to-end verifications PASSED 100%!")

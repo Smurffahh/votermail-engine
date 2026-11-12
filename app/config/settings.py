@@ -16,25 +16,27 @@ CONFIG_FILE_PATH = BASE_DIR / "config.json"
 for d in [DATA_DIR, TEMPLATES_DIR, OUTPUT_DIR, TEMP_DIR, LOGS_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
+def get_default_word_path() -> str:
+    real_doc = TEMPLATES_DIR / "SURAT PANGGILAN.doc"
+    if real_doc.exists():
+        return str(real_doc.resolve())
+    sample_doc = TEMPLATES_DIR / "SAMPLE_SURAT_DUMMY.docx"
+    if sample_doc.exists():
+        return str(sample_doc.resolve())
+    return ""
+
+def get_default_excel_path() -> str:
+    real_excel = TEMPLATES_DIR / "DAFTAR PEMILIH TETAP DESA KARANGJENGKOL.xlsx"
+    if real_excel.exists():
+        return str(real_excel.resolve())
+    sample_excel = TEMPLATES_DIR / "SAMPLE_DPT_DUMMY.xlsx"
+    if sample_excel.exists():
+        return str(sample_excel.resolve())
+    return ""
+
 class AppConfig(BaseModel):
-    word_path: str = Field(
-        default_factory=lambda: str(
-            (TEMPLATES_DIR / "SURAT PANGGILAN.doc").resolve()
-            if (TEMPLATES_DIR / "SURAT PANGGILAN.doc").exists()
-            else ""
-        )
-    )
-    excel_path: str = Field(
-        default_factory=lambda: str(
-            (TEMPLATES_DIR / "DAFTAR PEMILIH TETAP DESA KARANGJENGKOL.xlsx").resolve()
-            if (TEMPLATES_DIR / "DAFTAR PEMILIH TETAP DESA KARANGJENGKOL.xlsx").exists()
-            else (
-                (TEMPLATES_DIR / "SAMPLE_DPT_DUMMY.xlsx").resolve()
-                if (TEMPLATES_DIR / "SAMPLE_DPT_DUMMY.xlsx").exists()
-                else ""
-            )
-        )
-    )
+    word_path: str = Field(default_factory=get_default_word_path)
+    excel_path: str = Field(default_factory=get_default_excel_path)
     output_dir: str = Field(default_factory=lambda: str(OUTPUT_DIR.resolve()))
     address_mode: str = "Lengkap (Alamat, RT / RW)"
     enable_pdf_verification: bool = True
@@ -48,19 +50,11 @@ def load_app_config() -> AppConfig:
 
             excel = data.get("excel_path", "")
             if not excel or not os.path.exists(excel):
-                for candidate in [
-                    TEMPLATES_DIR / "DAFTAR PEMILIH TETAP DESA KARANGJENGKOL.xlsx",
-                    TEMPLATES_DIR / "SAMPLE_DPT_DUMMY.xlsx",
-                ]:
-                    if candidate.exists():
-                        data["excel_path"] = str(candidate.resolve())
-                        break
+                data["excel_path"] = get_default_excel_path()
 
             word = data.get("word_path", "")
             if not word or not os.path.exists(word):
-                candidate = TEMPLATES_DIR / "SURAT PANGGILAN.doc"
-                if candidate.exists():
-                    data["word_path"] = str(candidate.resolve())
+                data["word_path"] = get_default_word_path()
 
             out = data.get("output_dir", "")
             if not out or not os.path.exists(out):

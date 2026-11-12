@@ -35,7 +35,22 @@ from app.core.pdf_verifier import (
     verify_kadus_pdf,
 )
 from app.core.security import sanitize_filename, to_win_abs_path, validate_safe_output_path
-from app.core.word_preparer import WordCheckResult, check_and_prepare_word_template
+from app.core.word_preparer import (
+    WordCheckResult,
+    WordSnapshot,
+    check_and_prepare_word_template,
+    compute_word_snapshot,
+    analyze_word_diff,
+    get_file_fingerprint,
+)
+from app.core.excel_scanner import (
+    PreFlightScanResult,
+    ExcelSnapshot,
+    scan_and_validate_excel,
+    compute_excel_snapshot,
+    analyze_excel_diff,
+    get_excel_file_fingerprint,
+)
 from app.ui.components import KadusItemRow, MetricCard, StatusBadge
 
 class MainWindow(ctk.CTk):
@@ -70,14 +85,22 @@ class MainWindow(ctk.CTk):
 
         self.start_process_time: float = 0.0
 
+        self.word_fingerprint: tuple[str, float, int] | None = None
+        self.excel_fingerprint: tuple[str, float, int] | None = None
+        self.word_snapshot: WordSnapshot | None = None
+        self.excel_snapshot: ExcelSnapshot | None = None
+        self.word_file_dirty: bool = False
+        self.excel_file_dirty: bool = False
+
         self._build_ui()
         self._poll_worker_queue()
 
-        # Auto check if files exist on startup
         if self.cfg.word_path and os.path.exists(self.cfg.word_path):
             self.after(300, self._run_word_check)
         if self.cfg.excel_path and os.path.exists(self.cfg.excel_path):
             self.after(600, self._run_excel_scan)
+
+        self.after(3000, self._check_external_file_changes)
 
     def _build_ui(self) -> None:
         # Header Container
@@ -816,6 +839,23 @@ class MainWindow(ctk.CTk):
         self.word_check_result = res
         self.btn_check_word.configure(state="normal", text="1. Cek Ulang Word")
 
+        path = self.word_entry.get().strip()
+        new_snap = compute_word_snapshot(
+            res.prepared_docx_path,
+            path,
+            is_valid=res.is_valid,
+            detected_slot1=res.detected_fields_slot1,
+            detected_slot2=res.detected_fields_slot2,
+        )
+        if self.word_snapshot is not None and self.word_file_dirty:
+            diff_lines = analyze_word_diff(self.word_snapshot, new_snap)
+            for line in diff_lines:
+                self._log(line)
+
+        self.word_snapshot = new_snap
+        self.word_fingerprint = (new_snap.sha256, new_snap.mtime, new_snap.size)
+        self.word_file_dirty = False
+
         if res.is_valid:
             self.word_ready = True
             self.badge_word.set_status("Siap Mailing", "ready")
@@ -863,6 +903,17 @@ class MainWindow(ctk.CTk):
     def _apply_excel_results(self, res: PreFlightScanResult) -> None:
         self.excel_scan_result = res
         self.btn_scan_excel.configure(state="normal", text="2. Scan Ulang Excel")
+
+        path = self.excel_entry.get().strip()
+        new_snap = compute_excel_snapshot(res, path)
+        if self.excel_snapshot is not None and self.excel_file_dirty:
+            diff_lines = analyze_excel_diff(self.excel_snapshot, new_snap)
+            for line in diff_lines:
+                self._log(line)
+
+        self.excel_snapshot = new_snap
+        self.excel_fingerprint = (new_snap.sha256, new_snap.mtime, new_snap.size)
+        self.excel_file_dirty = False
 
         for child in self.sheets_scroll_frame.winfo_children():
             child.destroy()
@@ -912,6 +963,36 @@ class MainWindow(ctk.CTk):
 
         self._update_selected_metrics()
         self._check_ready_state()
+
+    def _check_external_file_changes(self) -> None:
+        if not self.is_processing:
+            word_path = self.word_entry.get().strip()
+            if word_path and os.path.exists(word_path) and self.word_fingerprint:
+                curr_fp = get_file_fingerprint(word_path)
+                if curr_fp != self.word_fingerprint and not self.word_file_dirty:
+                    self.word_file_dirty = True
+                    self.badge_word.set_status("[FILE DIPERBARUI - KLIK ANALISA ULANG]", "amber")
+                    self.word_ready = False
+                    self.word_check_result = None
+                    ready_docx = TEMP_DIR / "template_ready.docx"
+                    if ready_docx.exists():
+                        try:
+                            ready_docx.unlink(missing_ok=True)
+                        except Exception:
+                            pass
+                    self._check_ready_state()
+
+            excel_path = self.excel_entry.get().strip()
+            if excel_path and os.path.exists(excel_path) and self.excel_fingerprint:
+                curr_fp = get_excel_file_fingerprint(excel_path)
+                if curr_fp != self.excel_fingerprint and not self.excel_file_dirty:
+                    self.excel_file_dirty = True
+                    self.badge_excel.set_status("[FILE DIPERBARUI - KLIK ANALISA ULANG]", "amber")
+                    self.excel_ready = False
+                    self.excel_scan_result = None
+                    self._check_ready_state()
+
+        self.after(3000, self._check_external_file_changes)
 
     def _select_all_sheets(self) -> None:
         for row in self.kadus_rows.values():
