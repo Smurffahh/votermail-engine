@@ -1,0 +1,50 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local Configuration (Contains local machine absolute paths)
+config.json
+
+# Strict Zero-PII Protection: Master DPT & Master Word Templates
+data/templates/*
+!data/templates/.gitkeep
+!data/templates/SAMPLE_DPT_DUMMY.xlsx
+
+# Generated Outputs & Audit Reports
+data/output/*
+!data/output/.gitkeep
+*.pdf
+*.png
+
+# Temporary Staged Documents & Working Directories
+data/temp/*
+!data/temp/.gitkeep
+temp_*
+test_e2e_output/
+*.tmp
+*.docx.tmp
+*.pdf.tmp
+~$*
+
+# Application Runtime Logs
+logs/*
+!logs/.gitkeep
+*.log
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS Generated Files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Environments & Secrets
+venv/
+env/
+.env*
