@@ -1,7 +1,7 @@
 # VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
-# Copyright (c) 2026 Smurffahh (https://github.com/Smurffahh/votermail-engine)
+# Created by Danang Satria (https://github.com/Smurffahh/votermail-engine)
 
-__author__ = "Smurffahh"
+__author__ = "Danang Satria"
 
 import math
 import os
@@ -226,7 +226,7 @@ class MainWindow(ctk.CTk):
 
         btn_repo = ctk.CTkButton(
             footer_right,
-            text="GitHub Repository",
+            text="GitHub (@Smurffahh)",
             command=lambda: webbrowser.open(__repository__),
             fg_color=self.theme.primary_action,
             hover_color=self.theme.primary_action_hover,

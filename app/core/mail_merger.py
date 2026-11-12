@@ -1,7 +1,7 @@
 # VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
-# Copyright (c) 2026 Smurffahh (https://github.com/Smurffahh/votermail-engine)
+# Created by Danang Satria (https://github.com/Smurffahh/votermail-engine)
 
-__author__ = "Smurffahh"
+__author__ = "Danang Satria"
 
 import math
 import os
@@ -34,7 +34,7 @@ def apply_pdf_metadata(pdf_path: str, kadus_name: str = "") -> None:
         metadata = {
             "/Title": title_str,
             "/Author": f"{__author__} (VoterMail Engine)",
-            "/Creator": f"VoterMail Engine v{__version__} by {__author__}",
+            "/Creator": f"VoterMail Engine v{__version__} — Created by {__author__}",
             "/Producer": f"VoterMail Engine ({__repository__})",
         }
         writer.add_metadata(metadata)

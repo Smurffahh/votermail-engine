@@ -1,9 +1,11 @@
 # VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
-# Copyright (c) 2026 Smurffahh (https://github.com/Smurffahh/votermail-engine)
+# Created by Danang Satria (https://github.com/Smurffahh/votermail-engine)
 
 __app_name__ = "VoterMail Engine"
-__author__ = "Smurffahh"
+__author__ = "Danang Satria"
+__github_user__ = "Smurffahh"
 __repository__ = "https://github.com/Smurffahh/votermail-engine"
+__copyright__ = "Copyright (c) 2026 Danang Satria"
 __license__ = "MIT License — Official Civic Automation Tool"
 
 FEATURE_REGISTRY: list[dict[str, str]] = [
@@ -35,7 +37,7 @@ FEATURE_REGISTRY: list[dict[str, str]] = [
         "version": "1.4.0",
         "date": "2026-11-12",
         "title": "Auto-Dependency Installer & Author Credits",
-        "description": "Penambahan First-Run Auto-Dependency Installer, Sistem Credit & About Modal, serta Dynamic Feature Versioning.",
+        "description": 'Penambahan First-Run Auto-Dependency Installer, Sistem Credit "Danang Satria" & About Modal, serta Dynamic Feature Versioning.',
     },
 ]
 

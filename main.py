@@ -1,7 +1,7 @@
 # VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
-# Copyright (c) 2026 Smurffahh (https://github.com/Smurffahh/votermail-engine)
+# Created by Danang Satria (https://github.com/Smurffahh/votermail-engine)
 
-__author__ = "Smurffahh"
+__author__ = "Danang Satria"
 
 import importlib.util
 import os
@@ -45,7 +45,7 @@ def install_missing_packages_with_gui(missing: dict[str, str]) -> bool:
 
     lbl_title = tk.Label(
         root,
-        text="Menyiapkan VoterMail Engine untuk Penggunaan Pertama Kali...",
+        text="Menyiapkan VoterMail Engine (by Danang Satria) untuk Penggunaan Pertama Kali...",
         font=("Segoe UI", 11, "bold"),
         fg="#F8FAFC",
         bg="#0B0F19",

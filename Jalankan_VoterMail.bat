@@ -3,7 +3,7 @@ chcp 65001 >nul
 title VoterMail Engine — Launcher
 echo ========================================================
 echo       VoterMail Engine — Otomasi Mail-Merge C6
-echo               Dikembangkan oleh Smurffahh
+echo              Created by Danang Satria
 echo ========================================================
 echo.
 

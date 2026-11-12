@@ -1,7 +1,7 @@
 # VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
-# Copyright (c) 2026 Smurffahh (https://github.com/Smurffahh/votermail-engine)
+# Created by Danang Satria (https://github.com/Smurffahh/votermail-engine)
 
-__author__ = "Smurffahh"
+__author__ = "Danang Satria"
 
 import os
 from pathlib import Path
@@ -352,13 +352,15 @@ class TestMailMergeApp(unittest.TestCase):
         from app.config.version import (
             __app_name__,
             __author__,
+            __github_user__,
             __repository__,
             __version__,
             FEATURE_REGISTRY,
             get_current_version,
         )
         self.assertEqual(__app_name__, "VoterMail Engine")
-        self.assertEqual(__author__, "Smurffahh")
+        self.assertEqual(__author__, "Danang Satria")
+        self.assertEqual(__github_user__, "Smurffahh")
         self.assertTrue(__repository__.startswith("https://github.com/Smurffahh"))
         self.assertEqual(__version__, "1.4.0")
         self.assertEqual(get_current_version(), "1.4.0")

@@ -1,7 +1,7 @@
 # VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
-# Copyright (c) 2026 Smurffahh (https://github.com/Smurffahh/votermail-engine)
+# Created by Danang Satria (https://github.com/Smurffahh/votermail-engine)
 
-__author__ = "Smurffahh"
+__author__ = "Danang Satria"
 
 from .main_window import MainWindow
 from .components import MetricCard, StatusBadge, KadusItemRow, AboutModal

@@ -1,7 +1,7 @@
 # VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
-# Copyright (c) 2026 Smurffahh (https://github.com/Smurffahh/votermail-engine)
+# Created by Danang Satria (https://github.com/Smurffahh/votermail-engine)
 
-__author__ = "Smurffahh"
+__author__ = "Danang Satria"
 
 import os
 from pathlib import Path
@@ -64,7 +64,7 @@ def main():
     
     checklist = [
         ("PANITIA PEMILIHAN (case-insensitive)", lambda t: t.upper().count("PANITIA PEMILIHAN") >= 2),
-        ("Dikeluarkan pada tanggal ...........................", lambda t: t.count("Dikeluarkan pada tanggal ...........................") >= 2),
+        ("Dikeluarkan pada tanggal", lambda t: t.count("Dikeluarkan pada tanggal") >= 2),
         ("Karangjengkol, ....................................", lambda t: t.count("Karangjengkol, ....................................") >= 2),
         ("Penerima/Pemilih,", lambda t: t.count("Penerima/Pemilih,") >= 2),
         ("..............................................", lambda t: t.count("..............................................") >= 2),

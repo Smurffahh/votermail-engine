@@ -1,7 +1,7 @@
 # VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
-# Copyright (c) 2026 Smurffahh (https://github.com/Smurffahh/votermail-engine)
+# Created by Danang Satria (https://github.com/Smurffahh/votermail-engine)
 
-__author__ = "Smurffahh"
+__author__ = "Danang Satria"
 
 from .settings import (
     BASE_DIR,
@@ -22,7 +22,9 @@ from .theme import ThemeTokens, get_theme
 from .version import (
     __app_name__,
     __author__,
+    __github_user__,
     __repository__,
+    __copyright__,
     __license__,
     __version__,
     FEATURE_REGISTRY,
@@ -47,7 +49,9 @@ __all__ = [
     "get_theme",
     "__app_name__",
     "__author__",
+    "__github_user__",
     "__repository__",
+    "__copyright__",
     "__license__",
     "__version__",
     "FEATURE_REGISTRY",

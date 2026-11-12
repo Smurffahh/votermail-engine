@@ -1,7 +1,7 @@
 # VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
-# Copyright (c) 2026 Smurffahh (https://github.com/Smurffahh/votermail-engine)
+# Created by Danang Satria (https://github.com/Smurffahh/votermail-engine)
 
-__author__ = "Smurffahh"
+__author__ = "Danang Satria"
 
 import importlib.metadata
 import sys
@@ -13,6 +13,7 @@ from app.config.theme import ThemeTokens
 from app.config.version import (
     __app_name__,
     __author__,
+    __github_user__,
     __repository__,
     __license__,
     __version__,
@@ -287,7 +288,7 @@ class AboutModal(ctk.CTkToplevel):
 
         dev_title = ctk.CTkLabel(
             dev_info_left,
-            text=f"Author & Creator: {__author__}",
+            text=f"Developer & Creator: {__author__} (GitHub: @{__github_user__})",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
             text_color=self.theme.text_primary,
         )

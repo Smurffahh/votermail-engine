@@ -2,7 +2,7 @@
 
 [![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/Smurffahh/votermail-engine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Author: Smurffahh](https://img.shields.io/badge/Author-Smurffahh-purple.svg)](https://github.com/Smurffahh)
+[![Author: Danang Satria](https://img.shields.io/badge/Author-Danang%20Satria-purple.svg)](https://github.com/Smurffahh)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 
 Aplikasi desktop berbasis Python untuk otomatisasi mail-merge ribuan Surat Pemberitahuan Pemilih (Model C6 / Surat Panggilan) dari file Excel DPT ke dalam satu file PDF terpadu per Kadus/RW dengan jaminan presisi tata letak dokumen Microsoft Word asli, audit integritas PDF otomatis, serta sistem instalasi dependensi otomatis pada eksekusi pertama.
@@ -124,6 +124,6 @@ Repository ini dikonfigurasi dengan aturan `.gitignore` ketat:
 
 ## Credits & Lisensi
 
-- **Author & Developer**: **Smurffahh** ([GitHub Profile](https://github.com/Smurffahh))
-- **Repository**: [https://github.com/Smurffahh/votermail-engine](https://github.com/Smurffahh/votermail-engine)
+- **Created & Engineered by**: **Danang Satria** ([@Smurffahh](https://github.com/Smurffahh))
+- **GitHub Repository**: [https://github.com/Smurffahh/votermail-engine](https://github.com/Smurffahh/votermail-engine)
 - **Lisensi**: [MIT License](LICENSE) — Official Civic Automation Tool.
