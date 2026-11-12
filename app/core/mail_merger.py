@@ -1,3 +1,8 @@
+# VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
+# Copyright (c) 2026 Smurffahh (https://github.com/Smurffahh/votermail-engine)
+
+__author__ = "Smurffahh"
+
 import math
 import os
 from pathlib import Path
@@ -9,12 +14,38 @@ from typing import Callable
 import docx
 from docxcompose.composer import Composer
 from docxtpl import DocxTemplate
+from pypdf import PdfReader, PdfWriter
 import pythoncom
 import win32com.client
 
 from app.config.settings import TEMP_DIR
+from app.config.version import __version__, __author__, __repository__
 from app.core.excel_scanner import VoterData
 from app.core.security import safe_delete_file, to_win_abs_path
+
+def apply_pdf_metadata(pdf_path: str, kadus_name: str = "") -> None:
+    try:
+        reader = PdfReader(pdf_path)
+        writer = PdfWriter()
+        for page in reader.pages:
+            writer.add_page(page)
+
+        title_str = f"Surat Pemberitahuan Pemilih - {kadus_name}" if kadus_name else "Surat Pemberitahuan Pemilih"
+        metadata = {
+            "/Title": title_str,
+            "/Author": f"{__author__} (VoterMail Engine)",
+            "/Creator": f"VoterMail Engine v{__version__} by {__author__}",
+            "/Producer": f"VoterMail Engine ({__repository__})",
+        }
+        writer.add_metadata(metadata)
+
+        temp_pdf = f"{pdf_path}.meta.tmp"
+        with open(temp_pdf, "wb") as f:
+            writer.write(f)
+
+        shutil.move(temp_pdf, pdf_path)
+    except Exception:
+        pass
 
 def export_docx_to_pdf_via_word(docx_path: str, pdf_path: str) -> tuple[bool, str, str]:
     abs_docx = to_win_abs_path(docx_path)
@@ -172,6 +203,7 @@ def merge_voters_to_pdf_via_word_com(
                 safe_delete_file(abs_target_pdf)
             return False, 0, msg
 
+        apply_pdf_metadata(final_pdf, kadus_name=wilayah_name or sheet_name)
         return True, pages_count, "Berhasil"
     except Exception as exc:
         if os.path.exists(abs_target_pdf):
@@ -231,4 +263,6 @@ def generate_preview_via_word(
         output_pdf_path=output_pdf_path,
     )
     final_pdf = to_win_abs_path(output_pdf_path)
+    if ok and os.path.exists(final_pdf):
+        apply_pdf_metadata(final_pdf, kadus_name="Pratinjau")
     return ok, msg, final_pdf

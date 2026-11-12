@@ -1,3 +1,8 @@
+# VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
+# Copyright (c) 2026 Smurffahh (https://github.com/Smurffahh/votermail-engine)
+
+__author__ = "Smurffahh"
+
 import os
 from pathlib import Path
 import shutil
@@ -342,6 +347,48 @@ class TestMailMergeApp(unittest.TestCase):
         diff2 = analyze_excel_diff(snap1, snap2)
         self.assertTrue(any("KADUS 1" in line and "+3" in line for line in diff2))
         self.assertTrue(any("KADUS 6" in line for line in diff2))
+
+    def test_13_version_and_credits(self) -> None:
+        from app.config.version import (
+            __app_name__,
+            __author__,
+            __repository__,
+            __version__,
+            FEATURE_REGISTRY,
+            get_current_version,
+        )
+        self.assertEqual(__app_name__, "VoterMail Engine")
+        self.assertEqual(__author__, "Smurffahh")
+        self.assertTrue(__repository__.startswith("https://github.com/Smurffahh"))
+        self.assertEqual(__version__, "1.4.0")
+        self.assertEqual(get_current_version(), "1.4.0")
+        self.assertGreaterEqual(len(FEATURE_REGISTRY), 5)
+        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.4.0")
+
+    def test_14_dependency_bootstrapper(self) -> None:
+        import main
+        missing = main.get_missing_packages()
+        self.assertEqual(len(missing), 0)
+
+    def test_15_pdf_metadata(self) -> None:
+        from pypdf import PdfWriter, PdfReader
+        from app.core.mail_merger import apply_pdf_metadata
+        from app.config.version import __version__, __author__, __repository__
+
+        test_pdf = os.path.join(self.test_dir, "test_metadata.pdf")
+        writer = PdfWriter()
+        writer.add_blank_page(width=612, height=792)
+        with open(test_pdf, "wb") as f:
+            writer.write(f)
+
+        apply_pdf_metadata(test_pdf, kadus_name="KADUS 1")
+
+        reader = PdfReader(test_pdf)
+        meta = reader.metadata
+        self.assertIn("KADUS 1", meta.title)
+        self.assertIn(__author__, meta.author)
+        self.assertIn(f"v{__version__}", meta.creator)
+        self.assertIn(__repository__, meta.producer)
 
 if __name__ == "__main__":
     unittest.main()

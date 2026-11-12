@@ -1,3 +1,8 @@
+# VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
+# Copyright (c) 2026 Smurffahh (https://github.com/Smurffahh/votermail-engine)
+
+__author__ = "Smurffahh"
+
 import math
 import os
 from pathlib import Path
@@ -7,6 +12,7 @@ import sys
 import threading
 import time
 from typing import Any
+import webbrowser
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 
@@ -19,6 +25,13 @@ from app.config.settings import (
     TEMP_DIR,
 )
 from app.config.theme import DARK_THEME, LIGHT_THEME, ThemeTokens, get_theme
+from app.config.version import (
+    __app_name__,
+    __author__,
+    __repository__,
+    __license__,
+    __version__,
+)
 from app.core.excel_scanner import (
     PreFlightScanResult,
     SheetScanSummary,
@@ -51,7 +64,7 @@ from app.core.excel_scanner import (
     analyze_excel_diff,
     get_excel_file_fingerprint,
 )
-from app.ui.components import KadusItemRow, MetricCard, StatusBadge
+from app.ui.components import KadusItemRow, MetricCard, StatusBadge, AboutModal
 
 class MainWindow(ctk.CTk):
     def __init__(self) -> None:
@@ -117,13 +130,24 @@ class MainWindow(ctk.CTk):
         title_container = ctk.CTkFrame(header_frame, fg_color="transparent")
         title_container.pack(side="left", padx=20, pady=8)
 
+        title_top = ctk.CTkFrame(title_container, fg_color="transparent")
+        title_top.pack(anchor="w")
+
         app_title = ctk.CTkLabel(
-            title_container,
-            text="VoterMail Engine — Otomasi Surat Pemberitahuan Pemilih",
+            title_top,
+            text=f"{__app_name__} — Otomasi Surat Pemberitahuan Pemilih",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=16, weight="bold"),
             text_color=self.theme.text_primary,
         )
-        app_title.pack(anchor="w")
+        app_title.pack(side="left")
+
+        self.badge_version = StatusBadge(
+            title_top,
+            text=f"v{__version__}",
+            status="ready",
+            theme=self.theme,
+        )
+        self.badge_version.pack(side="left", padx=10)
 
         app_sub = ctk.CTkLabel(
             title_container,
@@ -162,9 +186,60 @@ class MainWindow(ctk.CTk):
             text_color="#34D399",
         ).pack(padx=10, pady=4)
 
+        # Footer Bar: Author Credits & Quick Links
+        footer_frame = ctk.CTkFrame(
+            self,
+            fg_color=self.theme.bg_card,
+            border_color=self.theme.border_card,
+            border_width=1,
+            corner_radius=0,
+            height=36,
+        )
+        footer_frame.pack(side="bottom", fill="x")
+
+        footer_left = ctk.CTkFrame(footer_frame, fg_color="transparent")
+        footer_left.pack(side="left", padx=16, pady=4)
+
+        lbl_footer_info = ctk.CTkLabel(
+            footer_left,
+            text=f"{__app_name__} v{__version__} • Dikembangkan oleh {__author__}",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            text_color=self.theme.text_secondary,
+        )
+        lbl_footer_info.pack(side="left")
+
+        footer_right = ctk.CTkFrame(footer_frame, fg_color="transparent")
+        footer_right.pack(side="right", padx=16, pady=4)
+
+        btn_about = ctk.CTkButton(
+            footer_right,
+            text="Tentang & Credit",
+            command=self._open_about_modal,
+            fg_color=self.theme.bg_inner,
+            hover_color=self.theme.border_inner,
+            text_color=self.theme.text_primary,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            height=26,
+            corner_radius=4,
+        )
+        btn_about.pack(side="left", padx=(0, 8))
+
+        btn_repo = ctk.CTkButton(
+            footer_right,
+            text="GitHub Repository",
+            command=lambda: webbrowser.open(__repository__),
+            fg_color=self.theme.primary_action,
+            hover_color=self.theme.primary_action_hover,
+            text_color="#FFFFFF",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            height=26,
+            corner_radius=4,
+        )
+        btn_repo.pack(side="left")
+
         # Main Workspace Container: 2-Column Responsive Layout without nested outer scrollbars
         main_body = ctk.CTkFrame(self, fg_color=self.theme.bg_root)
-        main_body.pack(fill="both", expand=True, padx=14, pady=12)
+        main_body.pack(fill="both", expand=True, padx=14, pady=(12, 6))
 
         # Left Column (46% width): Source Preparation
         self.left_col = ctk.CTkFrame(main_body, fg_color="transparent", width=580)
@@ -1287,3 +1362,6 @@ class MainWindow(ctk.CTk):
         for row in self.kadus_rows.values():
             row.set_enabled(True)
         self._check_ready_state()
+
+    def _open_about_modal(self) -> None:
+        AboutModal(self, self.theme)

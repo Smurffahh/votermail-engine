@@ -1,3 +1,8 @@
+# VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
+# Copyright (c) 2026 Smurffahh (https://github.com/Smurffahh/votermail-engine)
+
+__author__ = "Smurffahh"
+
 from .security import (
     sanitize_filename,
     validate_safe_output_path,
