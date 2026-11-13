@@ -189,6 +189,7 @@ def merge_voters_to_pdf_via_word_com(
         for next_page_file in page_doc_files[1:]:
             if cancel_event is not None and cancel_event.is_set():
                 return False, 0, "Proses mailing dibatalkan pengguna."
+            base_doc.add_page_break()
             composer.append(docx.Document(next_page_file))
 
         merged_docx_path = os.path.join(temp_dir, "merged_kadus.docx")

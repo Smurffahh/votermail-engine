@@ -4,6 +4,25 @@
 __author__ = "Danang Satria"
 
 from .main_window import MainWindow
-from .components import MetricCard, StatusBadge, KadusItemRow, AboutModal
+from .components import (
+    DocumentSourceRow,
+    CleanMetricBar,
+    KadusRowItem,
+    VoterPreviewTable,
+    MetricCard,
+    StatusBadge,
+    KadusItemRow,
+    AboutModal,
+)
 
-__all__ = ["MainWindow", "MetricCard", "StatusBadge", "KadusItemRow", "AboutModal"]
+__all__ = [
+    "MainWindow",
+    "DocumentSourceRow",
+    "CleanMetricBar",
+    "KadusRowItem",
+    "VoterPreviewTable",
+    "MetricCard",
+    "StatusBadge",
+    "KadusItemRow",
+    "AboutModal",
+]

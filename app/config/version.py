@@ -45,6 +45,12 @@ FEATURE_REGISTRY: list[dict[str, str]] = [
         "title": "Paket Portabel .EXE & GitHub Actions Auto-Release",
         "description": "Penambahan Paket Distribusi Portabel Windows (.EXE) via PyInstaller (--onedir) & Otomasi CI/CD GitHub Actions Auto-Release.",
     },
+    {
+        "version": "1.6.0",
+        "date": "2026-11-13",
+        "title": "Modern Minimalist UI & Dynamic Voter Preview",
+        "description": "Perombakan antarmuka Modern Minimalis (Linear/Fluent 2 Style), Auto-Scan instan berkas, Tabel Pratinjau Pemilih dinamis, dan tombol interaktif buka PDF per Kadus.",
+    },
 ]
 
 def get_current_version() -> str:

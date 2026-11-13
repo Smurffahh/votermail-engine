@@ -126,6 +126,11 @@ class TestMailMergeApp(unittest.TestCase):
     def tearDownClass(cls) -> None:
         if os.path.exists(cls.test_dir):
             shutil.rmtree(cls.test_dir, ignore_errors=True)
+        if hasattr(cls, "sample_dpt_file") and os.path.exists(cls.sample_dpt_file):
+            try:
+                os.remove(cls.sample_dpt_file)
+            except Exception:
+                pass
 
     def test_01_security_sanitization_and_paths(self) -> None:
         self.assertEqual(sanitize_filename("KADUS 1 / Krajan"), "KADUS 1 _ Krajan")
@@ -298,7 +303,7 @@ class TestMailMergeApp(unittest.TestCase):
         reader = PdfReader(out_preview)
         self.assertEqual(len(reader.pages), 1)
         text = reader.pages[0].extract_text()
-        self.assertIn("SURAT PEMBERITAHUAN UNTUK MEMBERIKAN SUARA", text)
+        self.assertIn("SURAT PEMBERITAHUAN PEMUNGUTAN SUARA KEPADA PEMILIH", text)
 
     def test_08_pdf_verifier_success_and_audit_export(self) -> None:
         voters = [
@@ -461,10 +466,10 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(__author__, "Danang Satria")
         self.assertEqual(__github_user__, "Smurffahh")
         self.assertTrue(__repository__.startswith("https://github.com/Smurffahh"))
-        self.assertEqual(__version__, "1.5.0")
-        self.assertEqual(get_current_version(), "1.5.0")
-        self.assertGreaterEqual(len(FEATURE_REGISTRY), 6)
-        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.5.0")
+        self.assertEqual(__version__, "1.6.0")
+        self.assertEqual(get_current_version(), "1.6.0")
+        self.assertGreaterEqual(len(FEATURE_REGISTRY), 7)
+        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.6.0")
 
     def test_14_dependency_bootstrapper(self) -> None:
         import main
@@ -490,6 +495,20 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertIn(__author__, meta.author)
         self.assertIn(f"v{__version__}", meta.creator)
         self.assertIn(__repository__, meta.producer)
+
+    def test_16_ui_components_and_theme(self) -> None:
+        from app.config.theme import DARK_THEME, LIGHT_THEME, get_theme
+        from app.ui.components import (
+            DocumentSourceRow,
+            CleanMetricBar,
+            KadusRowItem,
+            VoterPreviewTable,
+            AboutModal,
+        )
+        self.assertEqual(DARK_THEME.primary_action, "#10B981")
+        self.assertEqual(LIGHT_THEME.primary_action, "#10B981")
+        self.assertEqual(get_theme("Dark").name, "Dark")
+        self.assertEqual(get_theme("Light").name, "Light")
 
 if __name__ == "__main__":
     unittest.main()

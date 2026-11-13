@@ -11,100 +11,152 @@ class ThemeTokens:
     name: str
     bg_root: str
     bg_card: str
-    bg_inner: str
-    border_card: str
-    border_inner: str
-    corner_radius_card: int
-    corner_radius_inner: int
+    bg_surface: str
+    bg_hover: str
+    border_subtle: str
     text_primary: str
-    metric_number: str
     text_secondary: str
     text_muted: str
     primary_action: str
     primary_action_hover: str
-    execute_action: str
-    execute_action_hover: str
     danger_action: str
     danger_action_hover: str
-    disabled_bg: str
-    disabled_text: str
-    badge_ready_bg: str
-    badge_ready_text: str
-    badge_process_bg: str
-    badge_process_text: str
-    badge_error_bg: str
-    badge_error_text: str
-    badge_amber_bg: str
-    badge_amber_text: str
-    badge_neutral_bg: str
-    badge_neutral_text: str
+    status_ready: str
+    status_warning: str
+    status_error: str
+    status_neutral: str
+    btn_secondary_bg: str
+    btn_secondary_hover: str
+    btn_secondary_border: str
+    btn_secondary_text: str
+    corner_radius_card: int = 12
+    corner_radius_inner: int = 8
     font_family_main: str = "Segoe UI"
     font_family_mono: str = "Consolas"
 
+    # Compatibility aliases
+    @property
+    def bg_inner(self) -> str:
+        return self.bg_surface
+
+    @property
+    def border_card(self) -> str:
+        return self.border_subtle
+
+    @property
+    def border_inner(self) -> str:
+        return self.border_subtle
+
+    @property
+    def metric_number(self) -> str:
+        return self.text_primary
+
+    @property
+    def execute_action(self) -> str:
+        return self.primary_action
+
+    @property
+    def execute_action_hover(self) -> str:
+        return self.primary_action_hover
+
+    @property
+    def disabled_bg(self) -> str:
+        return self.bg_surface
+
+    @property
+    def disabled_text(self) -> str:
+        return self.text_muted
+
+    @property
+    def badge_ready_bg(self) -> str:
+        return self.bg_surface
+
+    @property
+    def badge_ready_text(self) -> str:
+        return self.status_ready
+
+    @property
+    def badge_process_bg(self) -> str:
+        return self.bg_surface
+
+    @property
+    def badge_process_text(self) -> str:
+        return self.status_warning
+
+    @property
+    def badge_amber_bg(self) -> str:
+        return self.bg_surface
+
+    @property
+    def badge_amber_text(self) -> str:
+        return self.status_warning
+
+    @property
+    def badge_error_bg(self) -> str:
+        return self.bg_surface
+
+    @property
+    def badge_error_text(self) -> str:
+        return self.status_error
+
+    @property
+    def badge_neutral_bg(self) -> str:
+        return self.bg_surface
+
+    @property
+    def badge_neutral_text(self) -> str:
+        return self.status_neutral
+
 DARK_THEME = ThemeTokens(
     name="Dark",
-    bg_root="#0B0F19",
-    bg_card="#111827",
-    bg_inner="#090D16",
-    border_card="#1F2937",
-    border_inner="#1E293B",
-    corner_radius_card=12,
-    corner_radius_inner=8,
+    bg_root="#090D16",
+    bg_card="#111726",
+    bg_surface="#161F30",
+    bg_hover="#1E293B",
+    border_subtle="#1E293B",
     text_primary="#F8FAFC",
-    metric_number="#38BDF8",
     text_secondary="#94A3B8",
     text_muted="#64748B",
-    primary_action="#0284C7",
-    primary_action_hover="#0369A1",
-    execute_action="#059669",
-    execute_action_hover="#047857",
-    danger_action="#DC2626",
-    danger_action_hover="#B91C1C",
-    disabled_bg="#1E293B",
-    disabled_text="#475569",
-    badge_ready_bg="#064E3B",
-    badge_ready_text="#34D399",
-    badge_process_bg="#78350F",
-    badge_process_text="#FBBF24",
-    badge_error_bg="#7F1D1D",
-    badge_error_text="#F87171",
-    badge_amber_bg="#F59E0B",
-    badge_amber_text="#78350F",
-    badge_neutral_bg="#1E293B",
-    badge_neutral_text="#94A3B8",
+    primary_action="#10B981",
+    primary_action_hover="#059669",
+    danger_action="#EF4444",
+    danger_action_hover="#DC2626",
+    status_ready="#34D399",
+    status_warning="#FBBF24",
+    status_error="#F87171",
+    status_neutral="#94A3B8",
+    btn_secondary_bg="#161F30",
+    btn_secondary_hover="#1E293B",
+    btn_secondary_border="#1E293B",
+    btn_secondary_text="#F8FAFC",
+    corner_radius_card=12,
+    corner_radius_inner=8,
 )
 
 LIGHT_THEME = ThemeTokens(
     name="Light",
-    bg_root="#F8FAFC",
+    bg_root="#F1F5F9",
     bg_card="#FFFFFF",
-    bg_inner="#F1F5F9",
-    border_card="#E2E8F0",
-    border_inner="#CBD5E1",
-    corner_radius_card=12,
-    corner_radius_inner=8,
+    bg_surface="#F8FAFC",
+    bg_hover="#E2E8F0",
+    border_subtle="#E2E8F0",
     text_primary="#0F172A",
-    metric_number="#0284C7",
     text_secondary="#475569",
-    text_muted="#94A3B8",
-    primary_action="#0284C7",
-    primary_action_hover="#0369A1",
-    execute_action="#059669",
-    execute_action_hover="#047857",
+    text_muted="#64748B",
+    primary_action="#10B981",
+    primary_action_hover="#059669",
     danger_action="#DC2626",
     danger_action_hover="#B91C1C",
-    disabled_bg="#E2E8F0",
-    disabled_text="#94A3B8",
-    badge_ready_bg="#DCFCE7",
-    badge_ready_text="#15803D",
-    badge_process_bg="#FEF3C7",
-    badge_process_text="#B45309",
-    badge_error_bg="#FEE2E2",
-    badge_error_text="#B91C1C",
-    badge_amber_bg="#F59E0B",
-    badge_amber_text="#78350F",
-    badge_neutral_bg="#E2E8F0",
-    badge_neutral_text="#475569",
+    status_ready="#059669",
+    status_warning="#D97706",
+    status_error="#DC2626",
+    status_neutral="#64748B",
+    btn_secondary_bg="#FFFFFF",
+    btn_secondary_hover="#E2E8F0",
+    btn_secondary_border="#E2E8F0",
+    btn_secondary_text="#0F172A",
+    corner_radius_card=12,
+    corner_radius_inner=8,
 )
 
 def get_theme(mode: Literal["Dark", "Light"] = "Dark") -> ThemeTokens:

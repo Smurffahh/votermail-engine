@@ -36,7 +36,11 @@ from app.core.excel_scanner import (
     PreFlightScanResult,
     SheetScanSummary,
     VoterData,
+    ExcelSnapshot,
     scan_and_validate_excel,
+    compute_excel_snapshot,
+    analyze_excel_diff,
+    get_excel_file_fingerprint,
 )
 from app.core.mail_merger import (
     generate_preview_via_word,
@@ -56,15 +60,14 @@ from app.core.word_preparer import (
     analyze_word_diff,
     get_file_fingerprint,
 )
-from app.core.excel_scanner import (
-    PreFlightScanResult,
-    ExcelSnapshot,
-    scan_and_validate_excel,
-    compute_excel_snapshot,
-    analyze_excel_diff,
-    get_excel_file_fingerprint,
+from app.ui.components import (
+    DocumentSourceRow,
+    CleanMetricBar,
+    KadusRowItem,
+    VoterPreviewTable,
+    StatusBadge,
+    AboutModal,
 )
-from app.ui.components import KadusItemRow, MetricCard, StatusBadge, AboutModal
 
 class MainWindow(ctk.CTk):
     def __init__(self) -> None:
@@ -90,11 +93,11 @@ class MainWindow(ctk.CTk):
         self.word_ready: bool = False
         self.excel_ready: bool = False
 
-        self.kadus_rows: dict[str, KadusItemRow] = {}
+        self.kadus_rows: dict[str, KadusRowItem] = {}
         self.log_history_all: list[str] = []
         self.log_history_preview: list[str] = []
         self.log_history_audit: list[str] = []
-        self.current_log_tab = "all"
+        self.current_log_tab = "preview"
 
         self.start_process_time: float = 0.0
 
@@ -117,17 +120,17 @@ class MainWindow(ctk.CTk):
 
     def _build_ui(self) -> None:
         # Header Container
-        header_frame = ctk.CTkFrame(
+        self.header_frame = ctk.CTkFrame(
             self,
             fg_color=self.theme.bg_card,
-            border_color=self.theme.border_card,
+            border_color=self.theme.border_subtle,
             border_width=1,
             corner_radius=0,
-            height=66,
+            height=64,
         )
-        header_frame.pack(side="top", fill="x")
+        self.header_frame.pack(side="top", fill="x")
 
-        title_container = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_container = ctk.CTkFrame(self.header_frame, fg_color="transparent")
         title_container.pack(side="left", padx=20, pady=8)
 
         title_top = ctk.CTkFrame(title_container, fg_color="transparent")
@@ -135,7 +138,7 @@ class MainWindow(ctk.CTk):
 
         app_title = ctk.CTkLabel(
             title_top,
-            text=f"{__app_name__} — Otomasi Surat Pemberitahuan Pemilih",
+            text=f"{__app_name__}",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=16, weight="bold"),
             text_color=self.theme.text_primary,
         )
@@ -151,16 +154,15 @@ class MainWindow(ctk.CTk):
 
         app_sub = ctk.CTkLabel(
             title_container,
-            text="Pilkades Karangjengkol 2026 • Pre-Flight DPT Scanner • 2-Up F4 Word COM • Automated PDF Verifier",
+            text="Otomasi Surat Pemberitahuan Pemilih Pilkades Karangjengkol",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
             text_color=self.theme.text_secondary,
         )
         app_sub.pack(anchor="w")
 
-        header_right = ctk.CTkFrame(header_frame, fg_color="transparent")
+        header_right = ctk.CTkFrame(self.header_frame, fg_color="transparent")
         header_right.pack(side="right", padx=20, pady=10)
 
-        # Theme toggle switch
         self.theme_segment = ctk.CTkSegmentedButton(
             header_right,
             values=["Dark", "Light"],
@@ -170,7 +172,22 @@ class MainWindow(ctk.CTk):
             height=28,
         )
         self.theme_segment.set(self.theme.name)
-        self.theme_segment.pack(side="left", padx=(0, 14))
+        self.theme_segment.pack(side="left", padx=(0, 10))
+
+        self.btn_about = ctk.CTkButton(
+            header_right,
+            text="Tentang & Credit",
+            command=self._open_about_modal,
+            fg_color=self.theme.btn_secondary_bg,
+            hover_color=self.theme.btn_secondary_hover,
+            border_color=self.theme.btn_secondary_border,
+            border_width=1,
+            text_color=self.theme.btn_secondary_text,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            height=28,
+            corner_radius=6,
+        )
+        self.btn_about.pack(side="left", padx=(0, 10))
 
         sec_pill = ctk.CTkFrame(
             header_right,
@@ -187,17 +204,17 @@ class MainWindow(ctk.CTk):
         ).pack(padx=10, pady=4)
 
         # Footer Bar: Author Credits & Quick Links
-        footer_frame = ctk.CTkFrame(
+        self.footer_frame = ctk.CTkFrame(
             self,
             fg_color=self.theme.bg_card,
-            border_color=self.theme.border_card,
+            border_color=self.theme.border_subtle,
             border_width=1,
             corner_radius=0,
             height=36,
         )
-        footer_frame.pack(side="bottom", fill="x")
+        self.footer_frame.pack(side="bottom", fill="x")
 
-        footer_left = ctk.CTkFrame(footer_frame, fg_color="transparent")
+        footer_left = ctk.CTkFrame(self.footer_frame, fg_color="transparent")
         footer_left.pack(side="left", padx=16, pady=4)
 
         lbl_footer_info = ctk.CTkLabel(
@@ -208,354 +225,185 @@ class MainWindow(ctk.CTk):
         )
         lbl_footer_info.pack(side="left")
 
-        footer_right = ctk.CTkFrame(footer_frame, fg_color="transparent")
+        footer_right = ctk.CTkFrame(self.footer_frame, fg_color="transparent")
         footer_right.pack(side="right", padx=16, pady=4)
 
-        btn_about = ctk.CTkButton(
+        lbl_footer_sec = ctk.CTkLabel(
             footer_right,
-            text="Tentang & Credit",
-            command=self._open_about_modal,
-            fg_color=self.theme.bg_inner,
-            hover_color=self.theme.border_inner,
-            text_color=self.theme.text_primary,
+            text="100% Pemrosesan Lokal & Aman • GitHub (@Smurffahh)",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            height=26,
-            corner_radius=4,
+            text_color=self.theme.text_secondary,
+            cursor="hand2",
         )
-        btn_about.pack(side="left", padx=(0, 8))
-
-        btn_repo = ctk.CTkButton(
-            footer_right,
-            text="GitHub (@Smurffahh)",
-            command=lambda: webbrowser.open(__repository__),
-            fg_color=self.theme.primary_action,
-            hover_color=self.theme.primary_action_hover,
-            text_color="#FFFFFF",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            height=26,
-            corner_radius=4,
-        )
-        btn_repo.pack(side="left")
+        lbl_footer_sec.pack(side="left")
+        lbl_footer_sec.bind("<Button-1>", lambda _: webbrowser.open(__repository__))
 
         # Main Workspace Container: 2-Column Responsive Layout without nested outer scrollbars
         main_body = ctk.CTkFrame(self, fg_color=self.theme.bg_root)
-        main_body.pack(fill="both", expand=True, padx=14, pady=(12, 6))
+        main_body.pack(fill="both", expand=True, padx=14, pady=(10, 6))
 
-        # Left Column (46% width): Source Preparation
-        self.left_col = ctk.CTkFrame(main_body, fg_color="transparent", width=580)
+        # Left Column (approx 46% width): Source Preparation & Kadus Selection
+        self.left_col = ctk.CTkFrame(main_body, fg_color="transparent", width=590)
         self.left_col.pack(side="left", fill="both", expand=False, padx=(0, 10))
         self.left_col.pack_propagate(False)
 
-        # Right Column (54% width): Output Settings, Mailing Engine, Live Logs
+        # Right Column (approx 54% width): Output Settings, Mailing Engine, Live Logs & Preview Table
         self.right_col = ctk.CTkFrame(main_body, fg_color="transparent")
         self.right_col.pack(side="right", fill="both", expand=True)
 
-        self._build_card_tahap1(self.left_col)
-        self._build_card_tahap2(self.left_col)
-        self._build_card_tahap3(self.right_col)
-        self._build_card_tahap4(self.right_col)
+        self._build_card_sources(self.left_col)
+        self._build_card_kadus(self.left_col)
+        self._build_card_exec(self.right_col)
+        self._build_card_activity(self.right_col)
 
-    # -------------------------------------------------------------
-    # TAHAP 1: Dokumen Master Word
-    # -------------------------------------------------------------
-    def _build_card_tahap1(self, parent: ctk.CTkFrame) -> None:
-        self.card_word = ctk.CTkFrame(
+    def _build_card_sources(self, parent: ctk.CTkFrame) -> None:
+        self.card_sources = ctk.CTkFrame(
             parent,
             fg_color=self.theme.bg_card,
-            border_color=self.theme.border_card,
+            border_color=self.theme.border_subtle,
             border_width=1,
             corner_radius=self.theme.corner_radius_card,
         )
-        self.card_word.pack(fill="x", pady=(0, 10))
+        self.card_sources.pack(fill="x", pady=(0, 10))
 
-        header = ctk.CTkFrame(self.card_word, fg_color="transparent")
-        header.pack(fill="x", padx=14, pady=(12, 6))
+        header = ctk.CTkFrame(self.card_sources, fg_color="transparent")
+        header.pack(fill="x", padx=14, pady=(12, 8))
 
         ctk.CTkLabel(
             header,
-            text="TAHAP 1 — DOKUMEN MASTER WORD",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=12, weight="bold"),
+            text="1. Sumber Dokumen",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
             text_color=self.theme.text_primary,
         ).pack(side="left")
 
-        self.badge_word = StatusBadge(header, "Belum Dicek", "neutral", self.theme)
-        self.badge_word.pack(side="right")
-
-        # File selection row
-        file_row = ctk.CTkFrame(self.card_word, fg_color="transparent")
-        file_row.pack(fill="x", padx=14, pady=(0, 6))
-
-        self.word_entry = ctk.CTkEntry(
-            file_row,
-            placeholder_text="Pilih file Word (.doc / .docx)...",
-            fg_color=self.theme.bg_inner,
-            border_color=self.theme.border_inner,
-            border_width=1,
-            corner_radius=self.theme.corner_radius_inner,
-            font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
-            text_color=self.theme.text_primary,
+        self.doc_row_word = DocumentSourceRow(
+            self.card_sources,
+            doc_type="Dokumen Master Word",
+            initial_path=self.cfg.word_path,
+            theme=self.theme,
+            on_browse=self._browse_word_file,
+            on_recheck=self._run_word_check,
+            on_preview=self._generate_preview,
+            recheck_label="Cek Ulang",
         )
-        self.word_entry.pack(side="left", fill="x", expand=True, padx=(0, 6))
-        self.word_entry.insert(0, self.cfg.word_path)
+        self.doc_row_word.pack(fill="x", padx=12, pady=(0, 8))
 
-        self.btn_browse_word = ctk.CTkButton(
-            file_row,
-            text="Pilih Word",
-            width=86,
-            height=30,
-            fg_color=self.theme.bg_inner,
-            hover_color=self.theme.border_inner,
-            border_color=self.theme.border_inner,
-            border_width=1,
-            corner_radius=self.theme.corner_radius_inner,
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.text_primary,
-            command=self._browse_word_file,
+        self.doc_row_excel = DocumentSourceRow(
+            self.card_sources,
+            doc_type="Data Pemilih Excel DPT",
+            initial_path=self.cfg.excel_path,
+            theme=self.theme,
+            on_browse=self._browse_excel_file,
+            on_recheck=self._run_excel_scan,
+            recheck_label="Scan Ulang",
         )
-        self.btn_browse_word.pack(side="left", padx=(0, 6))
+        self.doc_row_excel.pack(fill="x", padx=12, pady=(0, 12))
 
-        self.btn_check_word = ctk.CTkButton(
-            file_row,
-            text="1. Cek File Word",
-            width=120,
-            height=30,
-            fg_color=self.theme.primary_action,
-            hover_color=self.theme.primary_action_hover,
-            corner_radius=self.theme.corner_radius_inner,
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            text_color="#ffffff",
-            command=self._run_word_check,
-        )
-        self.btn_check_word.pack(side="left")
-
-        # Status & Action Frame (Left-aligned, dynamic wraplength, no clipping)
-        self.word_status_container = ctk.CTkFrame(
-            self.card_word,
-            fg_color=self.theme.bg_inner,
-            border_color=self.theme.border_inner,
-            border_width=1,
-            corner_radius=self.theme.corner_radius_inner,
-        )
-        self.word_status_container.pack(fill="x", padx=14, pady=(2, 10))
-
-        status_inner = ctk.CTkFrame(self.word_status_container, fg_color="transparent")
-        status_inner.pack(fill="x", padx=10, pady=8)
-
-        self.word_status_label = ctk.CTkLabel(
-            status_inner,
-            text="• Menunggu verifikasi dokumen Word...\n• Mendukung format RTF / .doc lama dan .docx modern\n• Otomatis injeksi 12 mail-merge tag & sinkronisasi jadwal",
-            anchor="w",
-            justify="left",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.text_secondary,
-        )
-        self.word_status_label.pack(side="left", fill="x", expand=True)
-
-        self.btn_preview_single = ctk.CTkButton(
-            status_inner,
-            text="Pratinjau 1 Lembar (PDF)",
-            width=145,
-            height=28,
-            fg_color=self.theme.bg_card,
-            hover_color=self.theme.border_inner,
-            border_color=self.theme.border_inner,
-            border_width=1,
-            corner_radius=6,
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
-            text_color=self.theme.metric_number,
-            command=self._generate_preview,
-        )
-        self.btn_preview_single.pack(side="right", padx=(8, 0))
-
-        # Dynamic wraplength event to prevent text clipping
-        self.word_status_container.bind(
-            "<Configure>",
-            lambda event: self.word_status_label.configure(wraplength=max(180, event.width - 180)),
-        )
-
-    # -------------------------------------------------------------
-    # TAHAP 2: Data Pemilih Excel DPT
-    # -------------------------------------------------------------
-    def _build_card_tahap2(self, parent: ctk.CTkFrame) -> None:
-        self.card_excel = ctk.CTkFrame(
+    def _build_card_kadus(self, parent: ctk.CTkFrame) -> None:
+        self.card_kadus = ctk.CTkFrame(
             parent,
             fg_color=self.theme.bg_card,
-            border_color=self.theme.border_card,
+            border_color=self.theme.border_subtle,
             border_width=1,
             corner_radius=self.theme.corner_radius_card,
         )
-        self.card_excel.pack(fill="both", expand=True)
+        self.card_kadus.pack(fill="both", expand=True)
 
-        header = ctk.CTkFrame(self.card_excel, fg_color="transparent")
-        header.pack(fill="x", padx=14, pady=(12, 6))
+        header = ctk.CTkFrame(self.card_kadus, fg_color="transparent")
+        header.pack(fill="x", padx=14, pady=(12, 8))
 
         ctk.CTkLabel(
             header,
-            text="TAHAP 2 — DATA PEMILIH EXCEL DPT",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=12, weight="bold"),
+            text="2. Pilih Wilayah Cetak (Kadus / RW)",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
             text_color=self.theme.text_primary,
         ).pack(side="left")
 
-        self.badge_excel = StatusBadge(header, "Belum Dicek", "neutral", self.theme)
-        self.badge_excel.pack(side="right")
-
-        # File selection row
-        file_row = ctk.CTkFrame(self.card_excel, fg_color="transparent")
-        file_row.pack(fill="x", padx=14, pady=(0, 6))
-
-        self.excel_entry = ctk.CTkEntry(
-            file_row,
-            placeholder_text="Pilih file DPT (.xlsx)...",
-            fg_color=self.theme.bg_inner,
-            border_color=self.theme.border_inner,
-            border_width=1,
-            corner_radius=self.theme.corner_radius_inner,
-            font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
-            text_color=self.theme.text_primary,
-        )
-        self.excel_entry.pack(side="left", fill="x", expand=True, padx=(0, 6))
-        self.excel_entry.insert(0, self.cfg.excel_path)
-
-        self.btn_browse_excel = ctk.CTkButton(
-            file_row,
-            text="Pilih Excel",
-            width=86,
-            height=30,
-            fg_color=self.theme.bg_inner,
-            hover_color=self.theme.border_inner,
-            border_color=self.theme.border_inner,
-            border_width=1,
-            corner_radius=self.theme.corner_radius_inner,
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.text_primary,
-            command=self._browse_excel_file,
-        )
-        self.btn_browse_excel.pack(side="left", padx=(0, 6))
-
-        self.btn_scan_excel = ctk.CTkButton(
-            file_row,
-            text="2. Scan File Excel",
-            width=120,
-            height=30,
-            fg_color=self.theme.primary_action,
-            hover_color=self.theme.primary_action_hover,
-            corner_radius=self.theme.corner_radius_inner,
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            text_color="#ffffff",
-            command=self._run_excel_scan,
-        )
-        self.btn_scan_excel.pack(side="left")
-
-        # 3 Metric Cards side-by-side
-        metric_row = ctk.CTkFrame(self.card_excel, fg_color="transparent")
-        metric_row.pack(fill="x", padx=14, pady=(4, 8))
-
-        self.m_sheets = MetricCard(metric_row, "Total Sheet", "0", self.theme)
-        self.m_sheets.pack(side="left", fill="x", expand=True, padx=(0, 6))
-
-        self.m_voters = MetricCard(metric_row, "Pemilih Terpilih", "0", self.theme)
-        self.m_voters.pack(side="left", fill="x", expand=True, padx=(0, 6))
-
-        self.m_pages = MetricCard(metric_row, "Estimasi Lembar", "0", self.theme)
-        self.m_pages.pack(side="left", fill="x", expand=True)
-
-        # Kadus list controls
-        list_ctrl = ctk.CTkFrame(self.card_excel, fg_color="transparent")
-        list_ctrl.pack(fill="x", padx=14, pady=(2, 4))
-
-        ctk.CTkLabel(
-            list_ctrl,
-            text="DAFTAR SHEET KADUS / RW",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            text_color=self.theme.text_secondary,
-        ).pack(side="left")
-
-        btn_box = ctk.CTkFrame(list_ctrl, fg_color="transparent")
+        btn_box = ctk.CTkFrame(header, fg_color="transparent")
         btn_box.pack(side="right")
 
-        ctk.CTkButton(
+        self.btn_select_all = ctk.CTkButton(
             btn_box,
             text="Pilih Semua",
             width=76,
-            height=22,
-            fg_color=self.theme.bg_inner,
-            hover_color=self.theme.border_inner,
-            border_color=self.theme.border_inner,
+            height=26,
+            fg_color=self.theme.btn_secondary_bg,
+            hover_color=self.theme.btn_secondary_hover,
+            border_color=self.theme.btn_secondary_border,
             border_width=1,
-            corner_radius=4,
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=10),
-            text_color=self.theme.text_secondary,
+            corner_radius=6,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            text_color=self.theme.btn_secondary_text,
             command=self._select_all_sheets,
-        ).pack(side="left", padx=(0, 4))
+        )
+        self.btn_select_all.pack(side="left", padx=(0, 6))
 
-        ctk.CTkButton(
+        self.btn_deselect_all = ctk.CTkButton(
             btn_box,
-            text="Batal Semua",
-            width=76,
-            height=22,
-            fg_color=self.theme.bg_inner,
-            hover_color=self.theme.border_inner,
-            border_color=self.theme.border_inner,
+            text="Reset",
+            width=64,
+            height=26,
+            fg_color=self.theme.btn_secondary_bg,
+            hover_color=self.theme.btn_secondary_hover,
+            border_color=self.theme.btn_secondary_border,
             border_width=1,
-            corner_radius=4,
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=10),
-            text_color=self.theme.text_secondary,
+            corner_radius=6,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            text_color=self.theme.btn_secondary_text,
             command=self._deselect_all_sheets,
-        ).pack(side="left")
+        )
+        self.btn_deselect_all.pack(side="left")
 
-        # Scrollable Kadus list frame (Clean inner frame, no outer trap)
+        self.metric_bar = CleanMetricBar(self.card_kadus, self.theme)
+        self.metric_bar.pack(fill="x", padx=12, pady=(0, 8))
+
         self.sheets_scroll_frame = ctk.CTkScrollableFrame(
-            self.card_excel,
-            fg_color=self.theme.bg_inner,
-            border_color=self.theme.border_inner,
+            self.card_kadus,
+            fg_color=self.theme.bg_surface,
+            border_color=self.theme.border_subtle,
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
         )
-        self.sheets_scroll_frame.pack(fill="both", expand=True, padx=14, pady=(2, 6))
+        self.sheets_scroll_frame.pack(fill="both", expand=True, padx=12, pady=(0, 8))
 
-        # Bottom brief summary bar
         self.excel_status_bar = ctk.CTkLabel(
-            self.card_excel,
+            self.card_kadus,
             text="Belum ada file Excel yang dipindai.",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=10),
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
             text_color=self.theme.text_muted,
             anchor="w",
         )
-        self.excel_status_bar.pack(fill="x", padx=16, pady=(0, 10))
+        self.excel_status_bar.pack(fill="x", padx=14, pady=(0, 10))
 
-    # -------------------------------------------------------------
-    # TAHAP 3: Pengaturan Output & Eksekusi Mailing
-    # -------------------------------------------------------------
-    def _build_card_tahap3(self, parent: ctk.CTkFrame) -> None:
+    def _build_card_exec(self, parent: ctk.CTkFrame) -> None:
         self.card_exec = ctk.CTkFrame(
             parent,
             fg_color=self.theme.bg_card,
-            border_color=self.theme.border_card,
+            border_color=self.theme.border_subtle,
             border_width=1,
             corner_radius=self.theme.corner_radius_card,
         )
         self.card_exec.pack(fill="x", pady=(0, 10))
 
         header = ctk.CTkFrame(self.card_exec, fg_color="transparent")
-        header.pack(fill="x", padx=16, pady=(12, 6))
+        header.pack(fill="x", padx=16, pady=(12, 8))
 
         ctk.CTkLabel(
             header,
-            text="TAHAP 3 — PENGATURAN OUTPUT & EKSEKUSI MAILING",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=12, weight="bold"),
+            text="3. Pengaturan & Cetak PDF",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
             text_color=self.theme.text_primary,
         ).pack(side="left")
 
         self.badge_mailing = StatusBadge(header, "Menunggu Word & Excel", "neutral", self.theme)
         self.badge_mailing.pack(side="right")
 
-        # Row 1: Output Directory
         out_row = ctk.CTkFrame(self.card_exec, fg_color="transparent")
-        out_row.pack(fill="x", padx=16, pady=(2, 6))
+        out_row.pack(fill="x", padx=16, pady=(0, 8))
 
         ctk.CTkLabel(
             out_row,
-            text="Folder Simpan PDF:",
+            text="Folder Hasil PDF:",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
             text_color=self.theme.text_secondary,
         ).pack(side="left", padx=(0, 8))
@@ -563,49 +411,51 @@ class MainWindow(ctk.CTk):
         self.output_entry = ctk.CTkEntry(
             out_row,
             placeholder_text="Pilih direktori output...",
-            fg_color=self.theme.bg_inner,
-            border_color=self.theme.border_inner,
+            fg_color=self.theme.bg_surface,
+            border_color=self.theme.border_subtle,
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
             text_color=self.theme.text_primary,
+            height=30,
         )
         self.output_entry.pack(side="left", fill="x", expand=True, padx=(0, 6))
         self.output_entry.insert(0, self.cfg.output_dir)
 
-        ctk.CTkButton(
+        self.btn_browse_output = ctk.CTkButton(
             out_row,
-            text="Pilih Folder",
+            text="Ubah Folder",
             width=86,
             height=30,
-            fg_color=self.theme.bg_inner,
-            hover_color=self.theme.border_inner,
-            border_color=self.theme.border_inner,
+            fg_color=self.theme.btn_secondary_bg,
+            hover_color=self.theme.btn_secondary_hover,
+            border_color=self.theme.btn_secondary_border,
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.text_primary,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            text_color=self.theme.btn_secondary_text,
             command=self._browse_output_dir,
-        ).pack(side="left", padx=(0, 6))
+        )
+        self.btn_browse_output.pack(side="left", padx=(0, 6))
 
-        ctk.CTkButton(
+        self.btn_open_output = ctk.CTkButton(
             out_row,
             text="Buka Folder",
             width=86,
             height=30,
-            fg_color=self.theme.bg_inner,
-            hover_color=self.theme.border_inner,
-            border_color=self.theme.border_inner,
+            fg_color=self.theme.btn_secondary_bg,
+            hover_color=self.theme.btn_secondary_hover,
+            border_color=self.theme.btn_secondary_border,
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.text_primary,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            text_color=self.theme.btn_secondary_text,
             command=self._open_output_dir,
-        ).pack(side="left")
+        )
+        self.btn_open_output.pack(side="left")
 
-        # Row 2: Settings Controls side-by-side (NO SCROLLING NEEDED)
         ctrl_row = ctk.CTkFrame(self.card_exec, fg_color="transparent")
-        ctrl_row.pack(fill="x", padx=16, pady=(2, 8))
+        ctrl_row.pack(fill="x", padx=16, pady=(0, 10))
 
         addr_box = ctk.CTkFrame(ctrl_row, fg_color="transparent")
         addr_box.pack(side="left")
@@ -615,15 +465,15 @@ class MainWindow(ctk.CTk):
             text="Format Alamat:",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
             text_color=self.theme.text_secondary,
-        ).pack(side="left", padx=(0, 6))
+        ).pack(side="left", padx=(0, 8))
 
         self.address_mode_menu = ctk.CTkOptionMenu(
             addr_box,
             values=["Lengkap (Alamat, RT / RW)", "Hanya Alamat"],
             width=210,
-            height=30,
-            fg_color=self.theme.bg_inner,
-            button_color=self.theme.border_inner,
+            height=28,
+            fg_color=self.theme.bg_surface,
+            button_color=self.theme.border_subtle,
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
             text_color=self.theme.text_primary,
@@ -637,10 +487,10 @@ class MainWindow(ctk.CTk):
 
         self.verify_switch = ctk.CTkSwitch(
             verify_box,
-            text="Verifikasi & Audit PDF Otomatis (On/Off)",
+            text="Periksa Keakuratan PDF Otomatis",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
             text_color=self.theme.text_primary,
-            progress_color=self.theme.execute_action,
+            progress_color=self.theme.primary_action,
             command=self._save_active_config,
         )
         if self.cfg.enable_pdf_verification:
@@ -649,19 +499,18 @@ class MainWindow(ctk.CTk):
             self.verify_switch.deselect()
         self.verify_switch.pack(side="right")
 
-        # Row 3: Action Buttons
         btn_action_row = ctk.CTkFrame(self.card_exec, fg_color="transparent")
-        btn_action_row.pack(fill="x", padx=16, pady=(4, 8))
+        btn_action_row.pack(fill="x", padx=16, pady=(0, 8))
 
         self.btn_start = ctk.CTkButton(
             btn_action_row,
-            text="3. Hubungkan & Mulai Mailing PDF",
+            text="Buat File PDF Sekarang",
             height=38,
-            fg_color=self.theme.execute_action,
-            hover_color=self.theme.execute_action_hover,
+            fg_color=self.theme.primary_action,
+            hover_color=self.theme.primary_action_hover,
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
-            text_color="#ffffff",
+            text_color="#FFFFFF",
             state="disabled",
             command=self._start_mailing_process,
         )
@@ -672,35 +521,36 @@ class MainWindow(ctk.CTk):
             text="Batalkan",
             width=100,
             height=38,
-            fg_color=self.theme.disabled_bg,
+            fg_color=self.theme.btn_secondary_bg,
             hover_color=self.theme.danger_action_hover,
+            border_color=self.theme.border_subtle,
+            border_width=1,
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=12, weight="bold"),
-            text_color=self.theme.disabled_text,
+            text_color=self.theme.text_muted,
             state="disabled",
             command=self._cancel_mailing,
         )
         self.btn_cancel.pack(side="left")
 
-        # Row 4: Smooth Progress Bar & Monospace Metrics
         prog_box = ctk.CTkFrame(
             self.card_exec,
-            fg_color=self.theme.bg_inner,
-            border_color=self.theme.border_inner,
+            fg_color=self.theme.bg_surface,
+            border_color=self.theme.border_subtle,
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
         )
-        prog_box.pack(fill="x", padx=16, pady=(2, 12))
+        prog_box.pack(fill="x", padx=16, pady=(0, 12))
 
         prog_inner = ctk.CTkFrame(prog_box, fg_color="transparent")
         prog_inner.pack(fill="x", padx=10, pady=8)
 
         self.progress_bar = ctk.CTkProgressBar(
             prog_inner,
-            height=14,
-            corner_radius=7,
-            progress_color=self.theme.execute_action,
-            fg_color=self.theme.border_card,
+            height=10,
+            corner_radius=5,
+            progress_color=self.theme.primary_action,
+            fg_color=self.theme.border_subtle,
         )
         self.progress_bar.set(0.0)
         self.progress_bar.pack(fill="x", pady=(0, 6))
@@ -724,81 +574,92 @@ class MainWindow(ctk.CTk):
         )
         self.eta_label.pack(side="right")
 
-    # -------------------------------------------------------------
-    # TAHAP 4: Aktivitas & Log Verifikasi PDF
-    # -------------------------------------------------------------
-    def _build_card_tahap4(self, parent: ctk.CTkFrame) -> None:
-        self.card_log = ctk.CTkFrame(
+    def _build_card_activity(self, parent: ctk.CTkFrame) -> None:
+        self.card_activity = ctk.CTkFrame(
             parent,
             fg_color=self.theme.bg_card,
-            border_color=self.theme.border_card,
+            border_color=self.theme.border_subtle,
             border_width=1,
             corner_radius=self.theme.corner_radius_card,
         )
-        self.card_log.pack(fill="both", expand=True)
+        self.card_activity.pack(fill="both", expand=True)
 
-        header = ctk.CTkFrame(self.card_log, fg_color="transparent")
-        header.pack(fill="x", padx=16, pady=(12, 6))
+        header = ctk.CTkFrame(self.card_activity, fg_color="transparent")
+        header.pack(fill="x", padx=16, pady=(12, 8))
 
         ctk.CTkLabel(
             header,
-            text="TAHAP 4 — AKTIVITAS & LOG VERIFIKASI PDF",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=12, weight="bold"),
+            text="Ringkasan Data & Aktivitas",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
             text_color=self.theme.text_primary,
         ).pack(side="left")
 
-        btn_ctrl = ctk.CTkFrame(header, fg_color="transparent")
-        btn_ctrl.pack(side="right")
+        ctrl_right = ctk.CTkFrame(header, fg_color="transparent")
+        ctrl_right.pack(side="right")
 
-        self.log_filter_tabs = ctk.CTkSegmentedButton(
-            btn_ctrl,
-            values=["Semua Log", "Pratinjau Data (5 Baris)", "Hasil Audit PDF"],
+        self.activity_tabs = ctk.CTkSegmentedButton(
+            ctrl_right,
+            values=["Pratinjau Pemilih", "Hasil Cek PDF", "Log Sistem"],
             font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
-            command=self._on_log_tab_selected,
-            height=24,
+            command=self._on_activity_tab_selected,
+            height=26,
         )
-        self.log_filter_tabs.set("Semua Log")
-        self.log_filter_tabs.pack(side="left", padx=(0, 8))
+        self.activity_tabs.set("Pratinjau Pemilih")
+        self.activity_tabs.pack(side="left", padx=(0, 8))
 
-        ctk.CTkButton(
-            btn_ctrl,
-            text="Bersihkan Log",
-            width=86,
-            height=24,
-            fg_color=self.theme.bg_inner,
-            hover_color=self.theme.border_inner,
-            border_color=self.theme.border_inner,
+        self.btn_clear_log = ctk.CTkButton(
+            ctrl_right,
+            text="Bersihkan",
+            width=70,
+            height=26,
+            fg_color=self.theme.btn_secondary_bg,
+            hover_color=self.theme.btn_secondary_hover,
+            border_color=self.theme.btn_secondary_border,
             border_width=1,
-            corner_radius=4,
+            corner_radius=6,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=10),
-            text_color=self.theme.text_secondary,
+            text_color=self.theme.btn_secondary_text,
             command=self._clear_logs,
-        ).pack(side="left")
+        )
+        self.btn_clear_log.pack(side="left")
 
-        # Monospace Text Box for Log Messages
-        self.log_textbox = ctk.CTkTextbox(
-            self.card_log,
-            fg_color=self.theme.bg_inner,
-            border_color=self.theme.border_inner,
+        self.activity_content_frame = ctk.CTkFrame(self.card_activity, fg_color="transparent")
+        self.activity_content_frame.pack(fill="both", expand=True, padx=14, pady=(0, 10))
+
+        self.voter_table = VoterPreviewTable(self.activity_content_frame, self.theme)
+
+        self.audit_textbox = ctk.CTkTextbox(
+            self.activity_content_frame,
+            fg_color=self.theme.bg_surface,
+            border_color=self.theme.border_subtle,
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
             text_color=self.theme.text_primary,
             wrap="char",
         )
-        self.log_textbox.pack(fill="both", expand=True, padx=16, pady=(0, 12))
 
-    # -------------------------------------------------------------
-    # Event Handlers & Core Methods
-    # -------------------------------------------------------------
+        self.log_textbox = ctk.CTkTextbox(
+            self.activity_content_frame,
+            fg_color=self.theme.bg_surface,
+            border_color=self.theme.border_subtle,
+            border_width=1,
+            corner_radius=self.theme.corner_radius_inner,
+            font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
+            text_color=self.theme.text_primary,
+            wrap="char",
+        )
+
+        self.voter_table.pack(fill="both", expand=True)
+
     def _browse_word_file(self) -> None:
         path = filedialog.askopenfilename(
             title="Pilih File Template Word",
             filetypes=[("Dokumen Word", "*.doc;*.docx;*.rtf"), ("Semua File", "*.*")],
         )
         if path:
-            self.word_entry.delete(0, "end")
-            self.word_entry.insert(0, path)
+            self.cfg.word_path = path
+            self.doc_row_word.set_file(path)
             self._save_active_config()
             self._run_word_check()
 
@@ -808,8 +669,8 @@ class MainWindow(ctk.CTk):
             filetypes=[("File Excel", "*.xlsx;*.xls"), ("Semua File", "*.*")],
         )
         if path:
-            self.excel_entry.delete(0, "end")
-            self.excel_entry.insert(0, path)
+            self.cfg.excel_path = path
+            self.doc_row_excel.set_file(path)
             self._save_active_config()
             self._run_excel_scan()
 
@@ -831,8 +692,8 @@ class MainWindow(ctk.CTk):
             messagebox.showinfo("Informasi", "Folder output belum dibuat di disk.")
 
     def _save_active_config(self) -> None:
-        self.cfg.word_path = self.word_entry.get().strip()
-        self.cfg.excel_path = self.excel_entry.get().strip()
+        self.cfg.word_path = self.doc_row_word.current_path
+        self.cfg.excel_path = self.doc_row_excel.current_path
         self.cfg.output_dir = self.output_entry.get().strip()
         self.cfg.address_mode = self.address_mode_menu.get().strip()
         self.cfg.enable_pdf_verification = self.verify_switch.get() == 1
@@ -845,6 +706,78 @@ class MainWindow(ctk.CTk):
         self.configure(fg_color=self.theme.bg_root)
         self.cfg.theme_mode = self.theme.name
         save_app_config(self.cfg)
+
+        self.header_frame.configure(fg_color=self.theme.bg_card, border_color=self.theme.border_subtle)
+        self.footer_frame.configure(fg_color=self.theme.bg_card, border_color=self.theme.border_subtle)
+        self.card_sources.configure(fg_color=self.theme.bg_card, border_color=self.theme.border_subtle)
+        self.card_kadus.configure(fg_color=self.theme.bg_card, border_color=self.theme.border_subtle)
+        self.card_exec.configure(fg_color=self.theme.bg_card, border_color=self.theme.border_subtle)
+        self.card_activity.configure(fg_color=self.theme.bg_card, border_color=self.theme.border_subtle)
+
+        self.doc_row_word.update_theme(self.theme)
+        self.doc_row_excel.update_theme(self.theme)
+        self.metric_bar.update_theme(self.theme)
+        self.sheets_scroll_frame.configure(fg_color=self.theme.bg_surface, border_color=self.theme.border_subtle)
+        for row in self.kadus_rows.values():
+            row.update_theme(self.theme)
+
+        self.voter_table.update_theme(self.theme)
+        self.audit_textbox.configure(
+            fg_color=self.theme.bg_surface,
+            border_color=self.theme.border_subtle,
+            text_color=self.theme.text_primary,
+        )
+        self.log_textbox.configure(
+            fg_color=self.theme.bg_surface,
+            border_color=self.theme.border_subtle,
+            text_color=self.theme.text_primary,
+        )
+
+        self.output_entry.configure(
+            fg_color=self.theme.bg_surface,
+            border_color=self.theme.border_subtle,
+            text_color=self.theme.text_primary,
+        )
+        self.btn_browse_output.configure(
+            fg_color=self.theme.btn_secondary_bg,
+            hover_color=self.theme.btn_secondary_hover,
+            border_color=self.theme.btn_secondary_border,
+            text_color=self.theme.btn_secondary_text,
+        )
+        self.btn_open_output.configure(
+            fg_color=self.theme.btn_secondary_bg,
+            hover_color=self.theme.btn_secondary_hover,
+            border_color=self.theme.btn_secondary_border,
+            text_color=self.theme.btn_secondary_text,
+        )
+        self.btn_clear_log.configure(
+            fg_color=self.theme.btn_secondary_bg,
+            hover_color=self.theme.btn_secondary_hover,
+            border_color=self.theme.btn_secondary_border,
+            text_color=self.theme.btn_secondary_text,
+        )
+        self.btn_select_all.configure(
+            fg_color=self.theme.btn_secondary_bg,
+            hover_color=self.theme.btn_secondary_hover,
+            border_color=self.theme.btn_secondary_border,
+            text_color=self.theme.btn_secondary_text,
+        )
+        self.btn_deselect_all.configure(
+            fg_color=self.theme.btn_secondary_bg,
+            hover_color=self.theme.btn_secondary_hover,
+            border_color=self.theme.btn_secondary_border,
+            text_color=self.theme.btn_secondary_text,
+        )
+        self.btn_about.configure(
+            fg_color=self.theme.btn_secondary_bg,
+            hover_color=self.theme.btn_secondary_hover,
+            border_color=self.theme.btn_secondary_border,
+            text_color=self.theme.btn_secondary_text,
+        )
+        self.badge_version.update_theme(self.theme)
+        self.badge_mailing.update_theme(self.theme)
+
+        self._check_ready_state()
         self._log(f"[TEMA] Mengganti tema visual ke: {self.theme.name}")
 
     def _log(self, text: str, category: str = "all") -> None:
@@ -857,48 +790,53 @@ class MainWindow(ctk.CTk):
         elif category == "audit":
             self.log_history_audit.append(entry)
 
-        if self.current_log_tab == "all" or self.current_log_tab == category:
+        if self.current_log_tab == "all":
             self.log_textbox.insert("end", entry + "\n")
             self.log_textbox.see("end")
+        elif self.current_log_tab == "audit" and category == "audit":
+            self.audit_textbox.insert("end", entry + "\n")
+            self.audit_textbox.see("end")
 
     def _clear_logs(self) -> None:
-        if self.current_log_tab == "all":
-            self.log_history_all.clear()
-        elif self.current_log_tab == "preview":
-            self.log_history_preview.clear()
-        elif self.current_log_tab == "audit":
+        if self.current_log_tab == "audit":
             self.log_history_audit.clear()
-        self.log_textbox.delete("1.0", "end")
+            self.audit_textbox.delete("1.0", "end")
+        else:
+            self.log_history_all.clear()
+            self.log_textbox.delete("1.0", "end")
 
-    def _on_log_tab_selected(self, val: str) -> None:
-        self.log_textbox.delete("1.0", "end")
-        if val == "Pratinjau Data (5 Baris)":
+    def _on_activity_tab_selected(self, val: str) -> None:
+        self.voter_table.pack_forget()
+        self.audit_textbox.pack_forget()
+        self.log_textbox.pack_forget()
+
+        if val == "Pratinjau Pemilih":
             self.current_log_tab = "preview"
-            content = "\n".join(self.log_history_preview) or "Belum ada pratinjau data. Jalankan 'Scan File Excel' terlebih dahulu."
-        elif val == "Hasil Audit PDF":
+            self.voter_table.pack(fill="both", expand=True)
+        elif val == "Hasil Cek PDF":
             self.current_log_tab = "audit"
+            self.audit_textbox.pack(fill="both", expand=True)
+            self.audit_textbox.delete("1.0", "end")
             content = "\n".join(self.log_history_audit) or "Belum ada laporan audit PDF. Jalankan proses mailing terlebih dahulu."
+            self.audit_textbox.insert("end", content + "\n")
+            self.audit_textbox.see("end")
         else:
             self.current_log_tab = "all"
+            self.log_textbox.pack(fill="both", expand=True)
+            self.log_textbox.delete("1.0", "end")
             content = "\n".join(self.log_history_all) or "Belum ada riwayat log aktivitas."
+            self.log_textbox.insert("end", content + "\n")
+            self.log_textbox.see("end")
 
-        self.log_textbox.insert("end", content + "\n")
-        self.log_textbox.see("end")
-
-    # -------------------------------------------------------------
-    # Tahap 1: Cek Dokumen Word
-    # -------------------------------------------------------------
     def _run_word_check(self) -> None:
         if self.is_processing:
             return
-        path = self.word_entry.get().strip()
+        path = self.cfg.word_path
         if not path or not os.path.exists(path):
-            self.badge_word.set_status("Perlu Perbaikan", "error")
-            self.word_status_label.configure(text="• File Word tidak ditemukan di path yang ditentukan.")
+            self.doc_row_word.set_status("Berkas Word tidak ditemukan di path yang ditentukan.", "error")
             return
 
-        self.btn_check_word.configure(state="disabled", text="Memeriksa...")
-        self.badge_word.set_status("Memeriksa...", "process")
+        self.doc_row_word.set_status("Memeriksa struktur dokumen...", "process")
         self._log(f"[WORD] Memeriksa struktur dokumen: {os.path.basename(path)}")
 
         def worker() -> None:
@@ -912,9 +850,9 @@ class MainWindow(ctk.CTk):
 
     def _apply_word_results(self, res: WordCheckResult) -> None:
         self.word_check_result = res
-        self.btn_check_word.configure(state="normal", text="1. Cek Ulang Word")
+        path = self.cfg.word_path
+        self.doc_row_word.set_file(path)
 
-        path = self.word_entry.get().strip()
         new_snap = compute_word_snapshot(
             res.prepared_docx_path,
             path,
@@ -933,37 +871,26 @@ class MainWindow(ctk.CTk):
 
         if res.is_valid:
             self.word_ready = True
-            self.badge_word.set_status("Siap Mailing", "ready")
-            summary_text = (
-                f"• Status: Siap Mailing (12 Tag Terverifikasi Lengkap)\n"
-                f"• Field: {', '.join(res.detected_fields_slot1)}\n"
-                f"• File Kerja: {to_win_abs_path(res.prepared_docx_path)}"
-            )
-            self.word_status_label.configure(text=summary_text, text_color=self.theme.badge_ready_text)
+            self.doc_row_word.set_status(f"Siap Mailing • {len(res.detected_fields_slot1)} field terverifikasi", "ready")
             self._log(f"[WORD SIAP] 12 tag mail-merge terinjeksi rapi: {res.prepared_docx_path}")
         else:
             self.word_ready = False
-            self.badge_word.set_status("Perlu Perbaikan", "error")
-            self.word_status_label.configure(text=f"• Gagal: {res.message}", text_color=self.theme.badge_error_text)
+            self.doc_row_word.set_status(f"Perlu Perbaikan: {res.message}", "error")
             self._log(f"[WORD ERROR] {res.message}")
 
         self._check_ready_state()
 
-    # -------------------------------------------------------------
-    # Tahap 2: Scan Excel DPT
-    # -------------------------------------------------------------
     def _run_excel_scan(self) -> None:
         if self.is_processing:
             return
-        path = self.excel_entry.get().strip()
+        path = self.cfg.excel_path
         if not path or not os.path.exists(path):
-            self.badge_excel.set_status("Perlu Perbaikan", "error")
-            self.excel_status_bar.configure(text="File Excel tidak ditemukan.")
+            self.doc_row_excel.set_status("Berkas Excel tidak ditemukan.", "error")
+            self.excel_status_bar.configure(text="File Excel tidak ditemukan.", text_color=self.theme.status_error)
             return
 
         addr_mode = "lengkap" if "Lengkap" in self.address_mode_menu.get() else "hanya_alamat"
-        self.btn_scan_excel.configure(state="disabled", text="Memindai...")
-        self.badge_excel.set_status("Memindai...", "process")
+        self.doc_row_excel.set_status("Memindai struktur DPT...", "process")
         self._log(f"[EXCEL] Memindai struktur DPT: {os.path.basename(path)}")
 
         def worker() -> None:
@@ -977,9 +904,9 @@ class MainWindow(ctk.CTk):
 
     def _apply_excel_results(self, res: PreFlightScanResult) -> None:
         self.excel_scan_result = res
-        self.btn_scan_excel.configure(state="normal", text="2. Scan Ulang Excel")
+        path = self.cfg.excel_path
+        self.doc_row_excel.set_file(path)
 
-        path = self.excel_entry.get().strip()
         new_snap = compute_excel_snapshot(res, path)
         if self.excel_snapshot is not None and self.excel_file_dirty:
             diff_lines = analyze_excel_diff(self.excel_snapshot, new_snap)
@@ -998,16 +925,15 @@ class MainWindow(ctk.CTk):
 
         if not voter_sheets:
             self.excel_ready = False
-            self.badge_excel.set_status("Perlu Perbaikan", "error")
-            self.excel_status_bar.configure(text="Tidak ditemukan Sheet DPT yang valid (Header Baris 10).")
+            self.doc_row_excel.set_status("Tidak ditemukan Sheet DPT yang valid (Header Baris 10).", "error")
+            self.excel_status_bar.configure(text="Tidak ditemukan Sheet DPT yang valid.", text_color=self.theme.status_error)
             self._check_ready_state()
             return
 
         for s in voter_sheets:
-            row = KadusItemRow(
+            row = KadusRowItem(
                 self.sheets_scroll_frame,
                 sheet_name=s.sheet_name,
-                wilayah_text=s.wilayah_text,
                 voter_count=s.total_voters,
                 page_count=s.expected_pages,
                 is_selected=True,
@@ -1017,18 +943,26 @@ class MainWindow(ctk.CTk):
             row.pack(fill="x", pady=2, padx=4)
             self.kadus_rows[s.sheet_name] = row
 
+        sample_voters: list[VoterData] = []
+        for s in voter_sheets:
+            if s.voters:
+                sample_voters.extend(s.voters)
+                if len(sample_voters) >= 5:
+                    break
+        self.voter_table.set_voters(sample_voters[:5])
+
         self.excel_ready = True
         if res.is_valid:
-            self.badge_excel.set_status("Siap Mailing", "ready")
+            self.doc_row_excel.set_status(f"Siap Mailing • {res.total_sheets} Kadus ({res.total_voters:,} pemilih)", "ready")
             self.excel_status_bar.configure(
                 text=f"✓ Ditemukan {res.total_sheets} Sheet DPT valid ({res.total_voters:,} pemilih). Zero Error.",
-                text_color=self.theme.badge_ready_text,
+                text_color=self.theme.status_ready,
             )
         else:
-            self.badge_excel.set_status("Perlu Perbaikan", "process")
+            self.doc_row_excel.set_status(f"Perlu Perhatian • Ditemukan {len(res.all_issues)} anomali", "warning")
             self.excel_status_bar.configure(
                 text=f"Perhatian: Ditemukan {len(res.all_issues)} anomali pada data pemilih.",
-                text_color=self.theme.badge_process_text,
+                text_color=self.theme.status_warning,
             )
 
         if res.preview_samples:
@@ -1041,12 +975,12 @@ class MainWindow(ctk.CTk):
 
     def _check_external_file_changes(self) -> None:
         if not self.is_processing:
-            word_path = self.word_entry.get().strip()
+            word_path = self.cfg.word_path
             if word_path and os.path.exists(word_path) and self.word_fingerprint:
                 curr_fp = get_file_fingerprint(word_path)
                 if curr_fp != self.word_fingerprint and not self.word_file_dirty:
                     self.word_file_dirty = True
-                    self.badge_word.set_status("[FILE DIPERBARUI - KLIK ANALISA ULANG]", "amber")
+                    self.doc_row_word.set_status("[File Diperbarui - Klik Cek Ulang]", "warning")
                     self.word_ready = False
                     self.word_check_result = None
                     ready_docx = TEMP_DIR / "template_ready.docx"
@@ -1057,12 +991,12 @@ class MainWindow(ctk.CTk):
                             pass
                     self._check_ready_state()
 
-            excel_path = self.excel_entry.get().strip()
+            excel_path = self.cfg.excel_path
             if excel_path and os.path.exists(excel_path) and self.excel_fingerprint:
                 curr_fp = get_excel_file_fingerprint(excel_path)
                 if curr_fp != self.excel_fingerprint and not self.excel_file_dirty:
                     self.excel_file_dirty = True
-                    self.badge_excel.set_status("[FILE DIPERBARUI - KLIK ANALISA ULANG]", "amber")
+                    self.doc_row_excel.set_status("[File Diperbarui - Klik Scan Ulang]", "warning")
                     self.excel_ready = False
                     self.excel_scan_result = None
                     self._check_ready_state()
@@ -1088,15 +1022,14 @@ class MainWindow(ctk.CTk):
             if s.sheet_name in self.kadus_rows and self.kadus_rows[s.sheet_name].checkbox_var.get()
         ]
 
+        kadus_count = len(selected_sheets)
         total_voters = sum(s.total_voters for s in selected_sheets)
         total_pages = sum(s.expected_pages for s in selected_sheets)
 
-        self.m_sheets.set_value(str(len(selected_sheets)))
-        self.m_voters.set_value(f"{total_voters:,}".replace(",", "."))
-        self.m_pages.set_value(f"{total_pages:,}".replace(",", "."))
+        self.metric_bar.update_metrics(kadus_count, total_voters, total_pages)
 
         self.status_detail_label.configure(
-            text=f"Siap Memproses: 0 / {total_voters:,} Pemilih ({len(selected_sheets)} Kadus)".replace(",", ".")
+            text=f"Siap Memproses: 0 / {total_voters:,} Pemilih ({kadus_count} Kadus)".replace(",", ".")
         )
 
         self._check_ready_state()
@@ -1108,21 +1041,34 @@ class MainWindow(ctk.CTk):
             return
 
         if self.word_ready and self.excel_ready and selected_count > 0:
-            self.btn_start.configure(state="normal", text="3. Hubungkan & Mulai Mailing PDF", fg_color=self.theme.execute_action)
+            self.btn_start.configure(
+                state="normal",
+                text="Buat File PDF Sekarang",
+                fg_color=self.theme.primary_action,
+                hover_color=self.theme.primary_action_hover,
+                text_color="#FFFFFF",
+            )
             self.badge_mailing.set_status("Siap Mailing", "ready")
         elif selected_count == 0 and self.word_ready and self.excel_ready:
-            self.btn_start.configure(state="disabled", text="Pilih Minimal 1 Sheet Kadus", fg_color=self.theme.disabled_bg)
+            self.btn_start.configure(
+                state="disabled",
+                text="Pilih Minimal 1 Sheet Kadus",
+                fg_color=self.theme.btn_secondary_bg,
+                text_color=self.theme.text_muted,
+            )
             self.badge_mailing.set_status("Pilih Kadus", "neutral")
         else:
-            self.btn_start.configure(state="disabled", text="3. Hubungkan & Mulai Mailing PDF", fg_color=self.theme.disabled_bg)
+            self.btn_start.configure(
+                state="disabled",
+                text="Buat File PDF Sekarang",
+                fg_color=self.theme.btn_secondary_bg,
+                text_color=self.theme.text_muted,
+            )
             self.badge_mailing.set_status("Menunggu Word & Excel", "neutral")
 
-    # -------------------------------------------------------------
-    # Pratinjau 1 Lembar
-    # -------------------------------------------------------------
     def _generate_preview(self) -> None:
         if not self.word_check_result or not self.word_check_result.is_valid:
-            messagebox.showwarning("Peringatan", "Jalankan '1. Cek File Word' terlebih dahulu.")
+            messagebox.showwarning("Peringatan", "Jalankan 'Cek Ulang' pada berkas Word terlebih dahulu.")
             return
 
         out_dir = self.output_entry.get().strip() or str(OUTPUT_DIR.resolve())
@@ -1155,9 +1101,6 @@ class MainWindow(ctk.CTk):
         else:
             messagebox.showerror("Gagal Pratinjau", f"Gagal membuat pratinjau Word: {msg}")
 
-    # -------------------------------------------------------------
-    # Eksekusi Mailing Tahap 3
-    # -------------------------------------------------------------
     def _start_mailing_process(self) -> None:
         if self.is_processing or not self.word_check_result or not self.excel_scan_result:
             return
@@ -1177,11 +1120,18 @@ class MainWindow(ctk.CTk):
         self.cancel_event.clear()
         self.start_process_time = time.time()
 
-        # Update button states for processing
-        self.btn_start.configure(state="disabled", text="Sedang Memproses Mailing...", fg_color=self.theme.disabled_bg)
-        self.btn_cancel.configure(state="normal", fg_color=self.theme.danger_action, text_color="#ffffff")
-        self.btn_check_word.configure(state="disabled")
-        self.btn_scan_excel.configure(state="disabled")
+        self.btn_start.configure(
+            state="disabled",
+            text="Sedang Memproses Mailing...",
+            fg_color=self.theme.btn_secondary_bg,
+            text_color=self.theme.text_muted,
+        )
+        self.btn_cancel.configure(
+            state="normal",
+            fg_color=self.theme.danger_action,
+            hover_color=self.theme.danger_action_hover,
+            text_color="#FFFFFF",
+        )
         for row in self.kadus_rows.values():
             row.set_enabled(False)
             row.reset_status()
@@ -1228,14 +1178,13 @@ class MainWindow(ctk.CTk):
 
                 processed_voters_acc += s.total_voters
 
-                # Optional automatic verification
                 if verify_pdf_on and not self.cancel_event.is_set():
                     self.worker_queue.put(("verify_started", s.sheet_name))
                     ver = verify_kadus_pdf(out_pdf, s.sheet_name, s.voters)
                     audit_results.append(ver)
-                    self.worker_queue.put(("verify_done", ver))
+                    self.worker_queue.put(("verify_done", (ver, out_pdf)))
                 else:
-                    self.worker_queue.put(("kadus_completed", s.sheet_name))
+                    self.worker_queue.put(("kadus_completed", (s.sheet_name, out_pdf)))
 
             if audit_results and verify_pdf_on:
                 audit_file = export_audit_excel(audit_results, output_dir)
@@ -1251,9 +1200,6 @@ class MainWindow(ctk.CTk):
             self._log("[BATAL] Mengirim sinyal pembatalan ke proses latar belakang...")
             self.btn_cancel.configure(state="disabled", text="Membatalkan...")
 
-    # -------------------------------------------------------------
-    # Queue Polling
-    # -------------------------------------------------------------
     def _poll_worker_queue(self) -> None:
         try:
             while True:
@@ -1263,16 +1209,14 @@ class MainWindow(ctk.CTk):
                     self._apply_word_results(payload)
                 elif msg_type == "word_error":
                     self.word_ready = False
-                    self.btn_check_word.configure(state="normal", text="1. Cek File Word")
-                    self.badge_word.set_status("Error", "error")
+                    self.doc_row_word.set_status(f"Gagal: {payload}", "error")
                     self._log(f"[WORD ERROR] {payload}")
                     messagebox.showerror("Error Word", f"Gagal memeriksa file Word:\n{payload}")
                 elif msg_type == "excel_done":
                     self._apply_excel_results(payload)
                 elif msg_type == "excel_error":
                     self.excel_ready = False
-                    self.btn_scan_excel.configure(state="normal", text="2. Scan File Excel")
-                    self.badge_excel.set_status("Error", "error")
+                    self.doc_row_excel.set_status(f"Gagal: {payload}", "error")
                     self._log(f"[EXCEL ERROR] {payload}")
                     messagebox.showerror("Error Excel", f"Gagal membaca file Excel:\n{payload}")
 
@@ -1289,7 +1233,6 @@ class MainWindow(ctk.CTk):
                     self.status_detail_label.configure(
                         text=f"Selesai: {cur:,} / {tot:,} Pemilih ({pct * 100:.1f}%) • {sheet}".replace(",", ".")
                     )
-                    # Calculate ETA
                     elapsed = time.time() - self.start_process_time
                     if cur > 0 and elapsed > 1:
                         speed = cur / elapsed
@@ -1299,15 +1242,15 @@ class MainWindow(ctk.CTk):
                         self.eta_label.configure(text=f"Estimasi Sisa: {mins:02d}:{secs:02d} ({speed:.1f} pemilih/dtk)")
 
                 elif msg_type == "kadus_completed":
-                    sheet_name = payload
+                    sheet_name, out_pdf = payload
                     if sheet_name in self.kadus_rows:
-                        self.kadus_rows[sheet_name].set_completed()
-                    self._log(f"[SUKSES] PDF {sheet_name} selesai dibuat.")
+                        self.kadus_rows[sheet_name].set_completed(out_pdf)
+                    self._log(f"[SUKSES] PDF {sheet_name} selesai dibuat: {os.path.basename(out_pdf)}")
 
                 elif msg_type == "kadus_failed":
                     sheet_name, err = payload
                     if sheet_name in self.kadus_rows:
-                        self.kadus_rows[sheet_name].set_error("[ERROR]")
+                        self.kadus_rows[sheet_name].set_error("• Gagal")
                     self._on_process_finished()
                     self._log(f"[ERROR] Gagal memproses {sheet_name}: {err}")
                     messagebox.showerror("Gagal Mailing", f"Terjadi kesalahan saat memproses {sheet_name}:\n{err}")
@@ -1316,12 +1259,12 @@ class MainWindow(ctk.CTk):
                     self._log(f"[AUDIT] Memverifikasi integritas PDF: {payload}...")
 
                 elif msg_type == "verify_done":
-                    ver: VerificationResult = payload
+                    ver, out_pdf = payload
                     if ver.sheet_name in self.kadus_rows:
                         if ver.is_valid:
-                            self.kadus_rows[ver.sheet_name].set_completed()
+                            self.kadus_rows[ver.sheet_name].set_completed(out_pdf)
                         else:
-                            self.kadus_rows[ver.sheet_name].set_error("[ANOMALI]")
+                            self.kadus_rows[ver.sheet_name].set_error("• Anomali")
                     self._log(ver.audit_summary, category="audit")
 
                 elif msg_type == "audit_exported":
@@ -1356,9 +1299,12 @@ class MainWindow(ctk.CTk):
 
     def _on_process_finished(self) -> None:
         self.is_processing = False
-        self.btn_cancel.configure(state="disabled", fg_color=self.theme.disabled_bg, text_color=self.theme.disabled_text, text="Batalkan")
-        self.btn_check_word.configure(state="normal")
-        self.btn_scan_excel.configure(state="normal")
+        self.btn_cancel.configure(
+            state="disabled",
+            fg_color=self.theme.btn_secondary_bg,
+            text_color=self.theme.text_muted,
+            text="Batalkan",
+        )
         for row in self.kadus_rows.values():
             row.set_enabled(True)
         self._check_ready_state()

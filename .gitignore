@@ -23,6 +23,7 @@ data/temp/*
 !data/temp/.gitkeep
 temp_*
 test_e2e_output/
+sample_dpt_*.xlsx
 *.tmp
 *.docx.tmp
 *.pdf.tmp
