@@ -21,7 +21,7 @@ import win32com.client
 from app.config.settings import TEMP_DIR
 from app.config.version import __version__, __author__, __repository__
 from app.core.excel_scanner import VoterData
-from app.core.security import safe_delete_file, to_win_abs_path
+from app.core.security import check_file_accessible_for_writing, safe_delete_file, to_win_abs_path
 
 def apply_pdf_metadata(pdf_path: str, kadus_name: str = "") -> None:
     try:
@@ -56,15 +56,17 @@ def export_docx_to_pdf_via_word(docx_path: str, pdf_path: str) -> tuple[bool, st
 
     Path(abs_pdf).parent.mkdir(parents=True, exist_ok=True)
 
-    if os.path.exists(abs_pdf):
-        try:
-            with open(abs_pdf, "a+b"):
-                pass
-        except (PermissionError, OSError):
-            stem = Path(abs_pdf).stem
-            ext = Path(abs_pdf).suffix
-            ts = int(time.time())
-            abs_pdf = to_win_abs_path(Path(abs_pdf).parent / f"{stem}_{ts}{ext}")
+    accessible, lock_err = check_file_accessible_for_writing(abs_pdf)
+    if not accessible:
+        stem = Path(abs_pdf).stem
+        ext = Path(abs_pdf).suffix
+        ts = int(time.time())
+        fallback_pdf = to_win_abs_path(Path(abs_pdf).parent / f"{stem}_{ts}{ext}")
+        fallback_ok, _ = check_file_accessible_for_writing(fallback_pdf)
+        if fallback_ok:
+            abs_pdf = fallback_pdf
+        else:
+            return False, lock_err, abs_pdf
 
     pythoncom.CoInitialize()
     word = None
@@ -84,28 +86,33 @@ def export_docx_to_pdf_via_word(docx_path: str, pdf_path: str) -> tuple[bool, st
         exported = False
         last_error = ""
 
-        # Tier 1: Positional ExportAsFixedFormat
-        try:
-            doc.ExportAsFixedFormat(abs_pdf, 17)
-            exported = True
-        except Exception as e1:
-            last_error = f"Tier 1 (ExportAsFixedFormat): {e1}"
+        for attempt in range(3):
+            # Tier 1: Positional ExportAsFixedFormat
+            try:
+                doc.ExportAsFixedFormat(abs_pdf, 17)
+                exported = True
+                break
+            except Exception as e1:
+                last_error = f"Tier 1 (ExportAsFixedFormat): {e1}"
 
-        # Tier 2: SaveAs2 with FileFormat=17
-        if not exported:
+            # Tier 2: SaveAs2 with FileFormat=17
             try:
                 doc.SaveAs2(abs_pdf, 17)
                 exported = True
+                break
             except Exception as e2:
                 last_error += f" | Tier 2 (SaveAs2): {e2}"
 
-        # Tier 3: SaveAs with FileFormat=17
-        if not exported:
+            # Tier 3: SaveAs with FileFormat=17
             try:
                 doc.SaveAs(abs_pdf, 17)
                 exported = True
+                break
             except Exception as e3:
                 last_error += f" | Tier 3 (SaveAs): {e3}"
+
+            if attempt < 2:
+                time.sleep(0.5)
 
         if not exported:
             return False, f"Gagal mengekspor PDF melalui MS Word: {last_error}", abs_pdf
@@ -141,6 +148,10 @@ def merge_voters_to_pdf_via_word_com(
     abs_template = to_win_abs_path(template_docx_path)
     abs_target_pdf = to_win_abs_path(output_pdf_path)
     Path(abs_target_pdf).parent.mkdir(parents=True, exist_ok=True)
+
+    accessible, lock_err = check_file_accessible_for_writing(abs_target_pdf)
+    if not accessible:
+        return False, 0, lock_err
 
     temp_dir = tempfile.mkdtemp(prefix="mailmerge_work_", dir=str(TEMP_DIR))
     total_voters = len(voters)
@@ -189,7 +200,6 @@ def merge_voters_to_pdf_via_word_com(
         for next_page_file in page_doc_files[1:]:
             if cancel_event is not None and cancel_event.is_set():
                 return False, 0, "Proses mailing dibatalkan pengguna."
-            base_doc.add_page_break()
             composer.append(docx.Document(next_page_file))
 
         merged_docx_path = os.path.join(temp_dir, "merged_kadus.docx")

@@ -188,6 +188,36 @@ def scan_and_validate_excel(file_path: str, address_mode: str = "lengkap") -> Pr
             all_issues=[ScanIssue(sheet_name="", row_index=0, column_name="File", issue="File Excel tidak ditemukan.")],
         )
 
+    file_size = os.path.getsize(file_path)
+    if file_size > 150 * 1024 * 1024:
+        return PreFlightScanResult(
+            is_valid=False,
+            all_issues=[
+                ScanIssue(
+                    sheet_name="",
+                    row_index=0,
+                    column_name="File",
+                    issue=f"Ukuran berkas Excel terlalu besar ({file_size / (1024 * 1024):.1f} MB, batas maksimal 150 MB). Periksa kembali berkas yang Anda pilih.",
+                )
+            ],
+        )
+
+    try:
+        with open(file_path, "rb") as f:
+            f.read(1024)
+    except (PermissionError, OSError):
+        return PreFlightScanResult(
+            is_valid=False,
+            all_issues=[
+                ScanIssue(
+                    sheet_name="",
+                    row_index=0,
+                    column_name="File",
+                    issue=f"Berkas Excel '{Path(file_path).name}' sedang dibuka atau dikunci aplikasi lain. Tutup Microsoft Excel atau aplikasi yang membuka berkas ini, lalu coba lagi.",
+                )
+            ],
+        )
+
     xl = pd.ExcelFile(file_path)
     summaries: list[SheetScanSummary] = []
     total_all_voters = 0

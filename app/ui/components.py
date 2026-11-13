@@ -621,6 +621,7 @@ class AboutModal(ctk.CTkToplevel):
         except Exception:
             pass
 
+        self.bind("<Escape>", lambda e: self.destroy())
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -735,7 +736,22 @@ class AboutModal(ctk.CTkToplevel):
             corner_radius=self.theme.corner_radius_inner,
             height=260,
         )
-        hist_scroll.pack(fill="both", expand=True, padx=16, pady=(0, 16))
+        hist_scroll.pack(fill="both", expand=True, padx=16, pady=(0, 10))
+
+        btn_close = ctk.CTkButton(
+            content_frame,
+            text="Tutup",
+            height=32,
+            fg_color=self.theme.btn_secondary_bg,
+            hover_color=self.theme.btn_secondary_hover,
+            border_color=self.theme.btn_secondary_border,
+            border_width=1,
+            text_color=self.theme.btn_secondary_text,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            corner_radius=self.theme.corner_radius_inner,
+            command=self.destroy,
+        )
+        btn_close.pack(anchor="e", padx=16, pady=(0, 14))
 
         for feat in reversed(FEATURE_REGISTRY):
             item = ctk.CTkFrame(hist_scroll, fg_color="transparent")

@@ -95,6 +95,7 @@ from app.core.pdf_verifier import (
     verify_kadus_pdf,
 )
 from app.core.security import (
+    check_file_accessible_for_writing,
     sanitize_cell_text,
     sanitize_filename,
     validate_safe_output_path,
@@ -137,6 +138,12 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(sanitize_filename("RW:05\\RT:02*?"), "RW_05_RT_02")
         self.assertTrue(sanitize_filename("CON").startswith("WILAYAH_CON"))
         self.assertTrue(sanitize_filename("PRN").startswith("WILAYAH_PRN"))
+        self.assertTrue(sanitize_filename("NUL.pdf").startswith("WILAYAH_NUL"))
+        self.assertTrue(sanitize_filename("COM1").startswith("WILAYAH_COM1"))
+        self.assertTrue(sanitize_filename("LPT3").startswith("WILAYAH_LPT3"))
+        self.assertEqual(sanitize_filename("KADUS\u202e1\x00_test"), "KADUS1_test")
+        self.assertEqual(sanitize_filename("KADUS 1...   "), "KADUS 1")
+        self.assertEqual(sanitize_filename("..."), "DOKUMEN_OUTPUT")
         self.assertEqual(sanitize_filename("../evil/path"), "evil_path")
 
         safe_path = validate_safe_output_path(self.test_dir, "document.pdf")
@@ -148,6 +155,10 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(sanitize_cell_text("=CMD('calc')"), "'=CMD('calc')")
         self.assertEqual(sanitize_cell_text("+123"), "'+123")
         self.assertEqual(sanitize_cell_text("Normal Text"), "Normal Text")
+
+        accessible, msg = check_file_accessible_for_writing(Path(self.test_dir) / "check_non_existent.pdf")
+        self.assertTrue(accessible)
+        self.assertEqual(msg, "")
 
     def test_02_transformations(self) -> None:
         self.assertEqual(transform_gender("L"), "Laki-laki")
@@ -303,7 +314,8 @@ class TestMailMergeApp(unittest.TestCase):
         reader = PdfReader(out_preview)
         self.assertEqual(len(reader.pages), 1)
         text = reader.pages[0].extract_text()
-        self.assertIn("SURAT PEMBERITAHUAN PEMUNGUTAN SUARA KEPADA PEMILIH", text)
+        self.assertIn("SURAT PEMBERITAHUAN UNTUK MEMBERIKAN SUARA", text)
+        self.assertIn("ALIF MUBAROK", text)
 
     def test_08_pdf_verifier_success_and_audit_export(self) -> None:
         voters = [
@@ -466,10 +478,10 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(__author__, "Danang Satria")
         self.assertEqual(__github_user__, "Smurffahh")
         self.assertTrue(__repository__.startswith("https://github.com/Smurffahh"))
-        self.assertEqual(__version__, "1.6.0")
-        self.assertEqual(get_current_version(), "1.6.0")
-        self.assertGreaterEqual(len(FEATURE_REGISTRY), 7)
-        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.6.0")
+        self.assertEqual(__version__, "1.7.0")
+        self.assertEqual(get_current_version(), "1.7.0")
+        self.assertGreaterEqual(len(FEATURE_REGISTRY), 8)
+        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.7.0")
 
     def test_14_dependency_bootstrapper(self) -> None:
         import main
@@ -509,6 +521,46 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(LIGHT_THEME.primary_action, "#10B981")
         self.assertEqual(get_theme("Dark").name, "Dark")
         self.assertEqual(get_theme("Light").name, "Light")
+
+    def test_17_boundary_and_lock_handling(self) -> None:
+        from unittest.mock import patch
+
+        with patch("os.path.getsize", return_value=160 * 1024 * 1024):
+            res_xl = scan_and_validate_excel(self.sample_dpt_file)
+            self.assertFalse(res_xl.is_valid)
+            self.assertTrue(any("terlalu besar" in iss.issue.lower() for iss in res_xl.all_issues))
+
+            res_doc = check_and_prepare_word_template(self.sample_dpt_file)
+            self.assertFalse(res_doc.is_valid)
+            self.assertTrue("terlalu besar" in res_doc.message.lower())
+
+        locked_file = Path(self.test_dir) / "locked_file.txt"
+        locked_file.write_text("sample content")
+
+        if os.name == "nt":
+            import ctypes
+            GENERIC_READ = 0x80000000
+            GENERIC_WRITE = 0x40000000
+            FILE_SHARE_NONE = 0
+            OPEN_EXISTING = 3
+            handle = ctypes.windll.kernel32.CreateFileW(
+                str(locked_file.resolve()),
+                GENERIC_READ | GENERIC_WRITE,
+                FILE_SHARE_NONE,
+                None,
+                OPEN_EXISTING,
+                0,
+                None,
+            )
+            try:
+                is_accessible, lock_err = check_file_accessible_for_writing(locked_file)
+                self.assertFalse(is_accessible)
+                self.assertIn("dikunci", lock_err.lower())
+            finally:
+                ctypes.windll.kernel32.CloseHandle(handle)
+
+            is_accessible2, _ = check_file_accessible_for_writing(locked_file)
+            self.assertTrue(is_accessible2)
 
 if __name__ == "__main__":
     unittest.main()

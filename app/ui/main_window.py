@@ -117,6 +117,30 @@ class MainWindow(ctk.CTk):
             self.after(600, self._run_excel_scan)
 
         self.after(3000, self._check_external_file_changes)
+        self.protocol("WM_DELETE_WINDOW", self._on_close_window)
+        self.bind("<F5>", lambda e: self._on_f5_refresh())
+
+    def _on_f5_refresh(self) -> None:
+        if self.is_processing:
+            return
+        self._run_word_check()
+        self._run_excel_scan()
+
+    def _on_close_window(self) -> None:
+        if self.is_processing:
+            if not messagebox.askyesno(
+                "Konfirmasi Keluar",
+                "Proses pembuatan dokumen sedang berjalan di latar belakang.\n\nApakah Anda yakin ingin membatalkan proses dan menutup aplikasi?",
+            ):
+                return
+            self.cancel_event.set()
+
+        try:
+            clean_temp_dir()
+        except Exception:
+            pass
+
+        self.destroy()
 
     def _build_ui(self) -> None:
         # Header Container

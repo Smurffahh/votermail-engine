@@ -207,7 +207,18 @@ def _convert_doc_to_docx_via_word_com(source_path: str, target_docx_path: str) -
         except Exception:
             pass
 
-        doc.SaveAs2(target_abs, FileFormat=12)
+        save_err = None
+        for attempt in range(3):
+            try:
+                doc.SaveAs2(target_abs, FileFormat=12)
+                save_err = None
+                break
+            except Exception as exc:
+                save_err = exc
+                if attempt < 2:
+                    time.sleep(0.5)
+        if save_err is not None:
+            raise save_err
     finally:
         if doc is not None:
             try:
@@ -278,6 +289,24 @@ def check_and_prepare_word_template(
         result.status_badge = "Perlu Perbaikan"
         result.message = f"File Word tidak ditemukan: {os.path.basename(word_file_path)}"
         result.issues.append("File tidak ditemukan.")
+        return result
+
+    file_size = os.path.getsize(word_file_path)
+    if file_size > 100 * 1024 * 1024:
+        result.is_valid = False
+        result.status_badge = "Perlu Perbaikan"
+        result.message = f"Ukuran berkas Word terlalu besar ({file_size / (1024 * 1024):.1f} MB, batas maksimal 100 MB). Periksa kembali berkas yang Anda pilih."
+        result.issues.append("Ukuran berkas melebihi batas 100 MB.")
+        return result
+
+    try:
+        with open(word_file_path, "rb") as f:
+            f.read(1024)
+    except (PermissionError, OSError):
+        result.is_valid = False
+        result.status_badge = "Perlu Perbaikan"
+        result.message = f"Berkas Word '{Path(word_file_path).name}' sedang dibuka atau dikunci aplikasi lain. Tutup Microsoft Word atau aplikasi yang membuka berkas ini, lalu coba lagi."
+        result.issues.append("Berkas terkunci oleh aplikasi lain.")
         return result
 
     base_dir = Path(work_dir) if work_dir else TEMP_DIR

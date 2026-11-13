@@ -51,6 +51,12 @@ FEATURE_REGISTRY: list[dict[str, str]] = [
         "title": "Modern Minimalist UI & Dynamic Voter Preview",
         "description": "Perombakan antarmuka Modern Minimalis (Linear/Fluent 2 Style), Auto-Scan instan berkas, Tabel Pratinjau Pemilih dinamis, dan tombol interaktif buka PDF per Kadus.",
     },
+    {
+        "version": "1.7.0",
+        "date": "2026-11-13",
+        "title": "Hardening Stabilitas COM, Sanitasi Keamanan, & Sistem Desain",
+        "description": "Optimalisasi menyeluruh stabilitas MS Word COM, penguatan keamanan sanitasi path & perangkat Windows, penyempurnaan microcopy & desain sistem UI/UX, serta perluasan cakupan pengujian otomatis.",
+    },
 ]
 
 def get_current_version() -> str:
