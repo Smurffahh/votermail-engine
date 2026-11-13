@@ -57,6 +57,12 @@ FEATURE_REGISTRY: list[dict[str, str]] = [
         "title": "Hardening Stabilitas COM, Sanitasi Keamanan, & Sistem Desain",
         "description": "Optimalisasi menyeluruh stabilitas MS Word COM, penguatan keamanan sanitasi path & perangkat Windows, penyempurnaan microcopy & desain sistem UI/UX, serta perluasan cakupan pengujian otomatis.",
     },
+    {
+        "version": "1.7.1",
+        "date": "2026-11-13",
+        "title": "Dual-Tuple Theme Tokens, Kontras Mode Terang, & Toolbar Anti-Clipping",
+        "description": "Perbaikan transisi tema instan berbasis Dual-Tuple Colors, penyempurnaan kontras Mode Terang, perbaikan tata letak tombol Sumber Dokumen anti-clipping, dan modernisasi kontrol pengubah tema.",
+    },
 ]
 
 def get_current_version() -> str:

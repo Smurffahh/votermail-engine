@@ -1,8 +1,8 @@
-# VoterMail Engine v1.7.0
+# VoterMail Engine v1.7.1
 
 [![Build & Release](https://github.com/Smurffahh/votermail-engine/actions/workflows/ci_release.yml/badge.svg)](https://github.com/Smurffahh/votermail-engine/actions/workflows/ci_release.yml)
 [![Latest Release](https://img.shields.io/github/v/release/Smurffahh/votermail-engine?color=blue&label=Latest%20Release)](https://github.com/Smurffahh/votermail-engine/releases/latest)
-[![Version](https://img.shields.io/badge/version-1.7.0-blue.svg)](https://github.com/Smurffahh/votermail-engine)
+[![Version](https://img.shields.io/badge/version-1.7.1-blue.svg)](https://github.com/Smurffahh/votermail-engine)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Author: Danang Satria](https://img.shields.io/badge/Author-Danang%20Satria-purple.svg)](https://github.com/Smurffahh)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
@@ -16,7 +16,7 @@ Aplikasi desktop berbasis Python untuk otomatisasi mail-merge ribuan Surat Pembe
 Untuk panitia di lapangan yang menginginkan aplikasi langsung pakai tanpa perlu menginstal Python atau dependensi:
 
 1. Kunjungi halaman rilis resmi: **[Unduh VoterMail Engine Rilis Terbaru](https://github.com/Smurffahh/votermail-engine/releases/latest)**.
-2. Unduh file arsip: `VoterMail_Engine_v1.7.0_Windows_x64_Portable.zip`.
+2. Unduh file arsip: `VoterMail_Engine_v1.7.1_Windows_x64_Portable.zip`.
 3. Ekstrak (unzip) arsip tersebut ke folder komputer Anda.
 4. Pastikan **Microsoft Word** telah terpasang pada Windows Anda.
 5. Klik ganda **`VoterMail_Engine.exe`** untuk langsung menjalankan aplikasi dalam 0 detik!
@@ -124,7 +124,7 @@ python main.py
 # Opsi B: Jalankan skrip builder via terminal
 python scripts/build_exe.py
 ```
-Hasil paket portabel akan tersedia di `dist/VoterMail_Engine/` dan arsip zip di `dist/VoterMail_Engine_v1.7.0_Windows_x64_Portable.zip`.
+Hasil paket portabel akan tersedia di `dist/VoterMail_Engine/` dan arsip zip di `dist/VoterMail_Engine_v1.7.1_Windows_x64_Portable.zip`.
 
 ### Menjalankan Unit Test (18 Tests — CI Safe)
 ```powershell

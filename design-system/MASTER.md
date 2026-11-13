@@ -25,46 +25,45 @@ Dokumentasi arsitektur desain visual, token warna, tipografi, dan disiplin antar
 
 ---
 
-## 2. Palet Token Warna
+## 2. Palet Token Warna & Arsitektur Dual-Tuple (v1.7.1)
 
-Definisi token warna tersentralisasi pada `app/config/theme.py`:
+Definisi token warna tersentralisasi pada `app/config/theme.py` menggunakan format **Native Dual-Tuple Color Tokens** bawaan CustomTkinter `(LIGHT_HEX, DARK_HEX)`. Format ini memungkinkan `ctk.set_appearance_mode(mode)` mengganti tema secara instan (zero flicker/lag) dan mempertahankan kontras WCAG AA (>= 4.5:1) pada Mode Terang maupun Mode Gelap tanpa perlu manipulasi konfigurasi manual.
 
-### A. Linear Dark Mode (Default)
-| Token | Nilai Hex | Fungsi / Penggunaan |
-| :--- | :--- | :--- |
-| `bg_root` | `#090D16` | Latar belakang jendela aplikasi utama |
-| `bg_card` | `#111726` | Latar belakang kartu utama (Header, File Control, Status, Log) |
-| `bg_surface` | `#161F30` | Latar belakang elemen bersarang (Metric bar, list sheet, input box) |
-| `bg_hover` | `#1E293B` | Warna highlight saat kursor berada di atas baris tabel / item |
-| `border_subtle` | `#1E293B` | Garis batas tipis 1px pada kartu dan pemisah modul |
-| `text_primary` | `#F8FAFC` | Teks utama, judul, dan angka metrik penting |
-| `text_secondary` | `#94A3B8` | Teks label pendukung, path file, dan deskripsi |
-| `text_muted` | `#64748B` | Timestamp, teks nonaktif, dan placeholder |
-| `primary_action` | `#10B981` | Tombol CTA utama ("Buat File PDF Sekarang") |
-| `primary_action_hover` | `#059669` | Efek hover tombol CTA utama |
-| `danger_action` | `#EF4444` | Tombol darurat ("Batalkan Proses") |
-| `danger_action_hover` | `#DC2626` | Efek hover tombol darurat |
-| `status_ready` | `#34D399` | Indikator badge siap cetak / validasi sukses |
-| `status_warning` | `#FBBF24` | Indikator badge perubahan file / peringatan |
-| `status_error` | `#F87171` | Indikator badge error / kegagalan validasi |
-| `status_neutral` | `#94A3B8` | Indikator badge menunggu berkas / status netral |
-
-### B. Clean Light Mode
-| Token | Nilai Hex | Fungsi / Penggunaan |
-| :--- | :--- | :--- |
-| `bg_root` | `#F1F5F9` | Latar belakang jendela aplikasi utama |
-| `bg_card` | `#FFFFFF` | Latar belakang kartu utama |
-| `bg_surface` | `#F8FAFC` | Latar belakang elemen bersarang |
-| `bg_hover` | `#E2E8F0` | Highlight hover baris tabel |
-| `border_subtle` | `#E2E8F0` | Garis batas tipis 1px |
-| `text_primary` | `#0F172A` | Teks utama dan judul |
-| `text_secondary` | `#475569` | Teks pendukung |
-| `text_muted` | `#64748B` | Timestamp dan teks nonaktif |
-| `primary_action` | `#10B981` | Tombol CTA utama |
-| `primary_action_hover` | `#059669` | Efek hover tombol CTA utama |
-| `status_ready` | `#059669` | Indikator badge sukses |
-| `status_warning` | `#D97706` | Indikator badge peringatan |
-| `status_error` | `#DC2626` | Indikator badge error |
+### Tabel Token Dual-Tuple (Light, Dark)
+| Token | Nilai Light Mode | Nilai Dark Mode | Fungsi / Penggunaan |
+| :--- | :--- | :--- | :--- |
+| `bg_root` | `#F1F5F9` | `#090D16` | Latar belakang jendela aplikasi utama |
+| `bg_card` | `#FFFFFF` | `#111726` | Latar belakang kartu utama (Header, Card 1-4, Footer) |
+| `bg_surface` | `#F8FAFC` | `#161F30` | Latar belakang sub-kartu, textbox log, dan input |
+| `bg_elevated` | `#F1F5F9` | `#1E293B` | Kotak Progress Bar & Header Tabel Pratinjau |
+| `bg_hover` | `#E2E8F0` | `#1E293B` | Highlight saat baris tabel di-hover kursor |
+| `border_card` | `#E2E8F0` | `#1E293B` | Hairline border struktural 1px kartu utama |
+| `border_surface` | `#CBD5E1` | `#26334D` | Border sub-kartu, tombol sekunder, & input field |
+| `text_primary` | `#0F172A` | `#F8FAFC` | Slate 900 pekat (Light) & Putih bersih (Dark) |
+| `text_secondary` | `#334155` | `#94A3B8` | Slate 700 (Light) & Slate 400 (Dark) |
+| `text_muted` | `#64748B` | `#64748B` | Timestamp, placeholder, dan teks status netral |
+| `btn_secondary_bg` | `#EEF2F6` | `#1E293B` | Latar tombol kontrol sekunder (Pilih, Reset, Cek) |
+| `btn_secondary_hover` | `#E2E8F0` | `#334155` | Efek hover tombol kontrol sekunder |
+| `btn_secondary_border`| `#94A3B8` | `#3B82F6` | Border penegas keterpencetan (*affordance*) |
+| `btn_secondary_text`  | `#0F172A` | `#F8FAFC` | Teks tombol kontrol sekunder |
+| `btn_accent_soft_bg`  | `#EFF6FF` | `#172554` | Latar tombol "Pilih File" & "Pratinjau PDF" |
+| `btn_accent_soft_hover`| `#DBEAFE` | `#1E3A8A` | Efek hover tombol lembut |
+| `btn_accent_soft_border`| `#60A5FA` | `#2563EB` | Border aksen biru lembut |
+| `btn_accent_soft_text` | `#1D4ED8` | `#93C5FD` | Teks tombol aksen biru |
+| `btn_primary_bg` | `#10B981` | `#10B981` | Tombol CTA utama ("Buat File PDF Sekarang") |
+| `btn_primary_hover` | `#059669` | `#059669` | Efek hover tombol CTA utama |
+| `btn_primary_text` | `#FFFFFF` | `#FFFFFF` | Teks tombol CTA utama |
+| `btn_danger_bg` | `#FEE2E2` | `#7F1D1D` | Tombol darurat pembatalan |
+| `btn_danger_hover` | `#FECACA` | `#991B1B` | Efek hover tombol darurat |
+| `btn_danger_text` | `#B91C1C` | `#FCA5A5` | Teks tombol darurat |
+| `btn_disabled_bg` | `#E2E8F0` | `#161F30` | Latar tombol saat dinonaktifkan |
+| `btn_disabled_text` | `#94A3B8` | `#475569` | Teks tombol saat dinonaktifkan |
+| `status_ready_bg` | `#ECFDF5` | `#064E3B` | Latar badge siap cetak / Zero PII pill |
+| `status_ready_text` | `#047857` | `#34D399` | Teks badge siap cetak / Zero PII pill |
+| `status_warn_bg` | `#FFFBEB` | `#78350F` | Latar badge peringatan |
+| `status_warn_text` | `#B45309` | `#FBBF24` | Teks badge peringatan |
+| `status_error_bg` | `#FEF2F2` | `#7F1D1D` | Latar badge error validasi |
+| `status_error_text` | `#DC2626` | `#F87171` | Teks badge error validasi |
 
 ---
 
@@ -99,6 +98,9 @@ Contoh Penerapan:
 
 - **Resolusi Minimum**: `1180x820` piksel.
 - **Resolusi Bawaan**: `1340x940` piksel, adaptif untuk monitor resolusi HD, Full HD (1080p), hingga 4K.
+- **Arsitektur 2-Row Kartu Sumber Dokumen (Anti-Clipping)**:
+  - **Baris Atas (Informasi & Status Berkas)**: Menampilkan nama dokumen di sisi kiri dan `StatusBadge` di sisi kanan, diikuti path berkas berlebar 100% dengan `text_secondary` dan truncating aman.
+  - **Baris Bawah (Dedicated Action Toolbar)**: Bar horizontal khusus tombol aksi dengan lebar proporsional (`115px` untuk tombol utama "Pilih File...", `95px-100px` untuk "Cek/Scan Ulang", `110px` untuk "Pratinjau PDF"). Struktur ini menjamin label tombol tidak akan pernah terpotong (*zero clipping*) berapa pun panjang nama berkas atau path folder.
 - **Pintasan Keyboard**:
   - `F5`: Memperbarui dan memindai ulang template Word serta berkas Excel secara bersamaan.
   - `Escape`: Menutup modal dialog ("Tentang Aplikasi & Riwayat Versi").

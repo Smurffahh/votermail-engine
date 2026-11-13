@@ -247,7 +247,8 @@ class TestMailMergeApp(unittest.TestCase):
         sample_docx = TEMPLATES_DIR / "SAMPLE_SURAT_DUMMY.docx"
         self.assertTrue(sample_docx.exists())
 
-        res = check_and_prepare_word_template(str(sample_docx), work_dir=self.test_dir)
+        dummy_work = os.path.join(self.test_dir, "dummy_work")
+        res = check_and_prepare_word_template(str(sample_docx), work_dir=dummy_work)
         self.assertTrue(res.is_valid)
         self.assertEqual(res.status_badge, "Siap Mailing")
         self.assertTrue(os.path.exists(res.prepared_docx_path))
@@ -478,10 +479,10 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(__author__, "Danang Satria")
         self.assertEqual(__github_user__, "Smurffahh")
         self.assertTrue(__repository__.startswith("https://github.com/Smurffahh"))
-        self.assertEqual(__version__, "1.7.0")
-        self.assertEqual(get_current_version(), "1.7.0")
-        self.assertGreaterEqual(len(FEATURE_REGISTRY), 8)
-        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.7.0")
+        self.assertEqual(__version__, "1.7.1")
+        self.assertEqual(get_current_version(), "1.7.1")
+        self.assertGreaterEqual(len(FEATURE_REGISTRY), 9)
+        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.7.1")
 
     def test_14_dependency_bootstrapper(self) -> None:
         import main
@@ -517,8 +518,8 @@ class TestMailMergeApp(unittest.TestCase):
             VoterPreviewTable,
             AboutModal,
         )
-        self.assertEqual(DARK_THEME.primary_action, "#10B981")
-        self.assertEqual(LIGHT_THEME.primary_action, "#10B981")
+        self.assertEqual(DARK_THEME.primary_action, ("#10B981", "#10B981"))
+        self.assertEqual(LIGHT_THEME.primary_action, ("#10B981", "#10B981"))
         self.assertEqual(get_theme("Dark").name, "Dark")
         self.assertEqual(get_theme("Light").name, "Light")
 

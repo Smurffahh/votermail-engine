@@ -11,7 +11,7 @@ from typing import Callable, Literal
 import webbrowser
 import customtkinter as ctk
 
-from app.config.theme import ThemeTokens
+from app.config.theme import THEME, ThemeTokens
 from app.config.version import (
     __app_name__,
     __author__,
@@ -24,7 +24,7 @@ from app.config.version import (
 from app.core.excel_scanner import VoterData
 
 class DocumentSourceRow(ctk.CTkFrame):
-    """Komponen baris ringkas dan rapi untuk sumber dokumen Word dan Excel."""
+    """Komponen 2 baris rapi untuk sumber dokumen Word dan Excel dengan toolbar anti-clipping."""
 
     def __init__(
         self,
@@ -40,8 +40,8 @@ class DocumentSourceRow(ctk.CTkFrame):
     ) -> None:
         super().__init__(
             master,
-            fg_color=theme.bg_surface,
-            border_color=theme.border_subtle,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=theme.corner_radius_inner,
             **kwargs,
@@ -56,84 +56,100 @@ class DocumentSourceRow(ctk.CTkFrame):
         self._build_ui(recheck_label)
 
     def _build_ui(self, recheck_label: str) -> None:
-        # Left container: Document type, filename, and friendly status
-        self.left_box = ctk.CTkFrame(self, fg_color="transparent")
-        self.left_box.pack(side="left", fill="both", expand=True, padx=14, pady=10)
+        # Inner padding container
+        inner = ctk.CTkFrame(self, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=14, pady=10)
+
+        # Baris 1: Header Atas (Kiri: Kategori dokumen, Kanan: Badge Status)
+        top_row = ctk.CTkFrame(inner, fg_color="transparent")
+        top_row.pack(fill="x")
 
         self.type_label = ctk.CTkLabel(
-            self.left_box,
+            top_row,
             text=self.doc_type,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            text_color=self.theme.text_secondary,
+            text_color=THEME["text_secondary"],
         )
-        self.type_label.pack(anchor="w")
-
-        filename = os.path.basename(self.current_path) if self.current_path else "Belum ada berkas dipilih"
-        self.filename_label = ctk.CTkLabel(
-            self.left_box,
-            text=filename,
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
-            text_color=self.theme.text_primary,
-        )
-        self.filename_label.pack(anchor="w", pady=(1, 2))
+        self.type_label.pack(side="left")
 
         self.status_label = ctk.CTkLabel(
-            self.left_box,
-            text="Menunggu pemeriksaan...",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.text_muted,
+            top_row,
+            text="• Menunggu pemeriksaan...",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            text_color=THEME["text_muted"],
         )
-        self.status_label.pack(anchor="w")
+        self.status_label.pack(side="right")
 
-        # Right container: Action buttons
-        self.right_box = ctk.CTkFrame(self, fg_color="transparent")
-        self.right_box.pack(side="right", padx=12, pady=10)
+        # Baris 2: Nama File (Lebar Penuh 100%, 13px bold)
+        filename = os.path.basename(self.current_path) if self.current_path else "Belum ada berkas dipilih"
+        self.filename_label = ctk.CTkLabel(
+            inner,
+            text=filename,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
+            text_color=THEME["text_primary"],
+            anchor="w",
+        )
+        self.filename_label.pack(fill="x", pady=(2, 4))
 
-        if self.on_preview:
-            self.btn_preview = ctk.CTkButton(
-                self.right_box,
-                text="Pratinjau PDF",
-                command=self.on_preview,
-                fg_color=self.theme.btn_secondary_bg,
-                hover_color=self.theme.btn_secondary_hover,
-                border_color=self.theme.btn_secondary_border,
-                border_width=1,
-                text_color=self.theme.btn_secondary_text,
-                font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-                height=28,
-                corner_radius=6,
-            )
-            self.btn_preview.pack(side="left", padx=4)
+        # Baris 3: Toolbar Tombol Aksi Proporsional (Anti-Clipping)
+        self.btn_row = ctk.CTkFrame(inner, fg_color="transparent")
+        self.btn_row.pack(fill="x", pady=(6, 0))
 
+        is_word = "word" in self.doc_type.lower()
+        browse_text = "Pilih File Word" if is_word else "Pilih File Excel"
+
+        # 1. Tombol Pilih File (Aksen Soft Biru)
+        self.btn_browse = ctk.CTkButton(
+            self.btn_row,
+            text=browse_text,
+            command=self.on_browse,
+            fg_color=THEME["btn_accent_soft_bg"],
+            hover_color=THEME["btn_accent_soft_hover"],
+            border_width=1,
+            border_color=THEME["btn_accent_soft_border"],
+            text_color=THEME["btn_accent_soft_text"],
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            width=115,
+            height=30,
+            corner_radius=6,
+        )
+        self.btn_browse.pack(side="left", padx=(0, 6))
+
+        # 2. Tombol Cek Ulang / Scan Ulang (Tombol Sekunder Tegas)
+        recheck_width = 95 if is_word else 100
         self.btn_recheck = ctk.CTkButton(
-            self.right_box,
+            self.btn_row,
             text=recheck_label,
             command=self.on_recheck,
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
             border_width=1,
-            text_color=self.theme.btn_secondary_text,
+            border_color=THEME["btn_secondary_border"],
+            text_color=THEME["btn_secondary_text"],
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            height=28,
+            width=recheck_width,
+            height=30,
             corner_radius=6,
         )
-        self.btn_recheck.pack(side="left", padx=4)
+        self.btn_recheck.pack(side="left", padx=(0, 6))
 
-        self.btn_browse = ctk.CTkButton(
-            self.right_box,
-            text="Ganti File",
-            command=self.on_browse,
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
-            border_width=1,
-            text_color=self.theme.btn_secondary_text,
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            height=28,
-            corner_radius=6,
-        )
-        self.btn_browse.pack(side="left", padx=(4, 0))
+        # 3. Tombol Pratinjau PDF (Hanya untuk Word)
+        if self.on_preview:
+            self.btn_preview = ctk.CTkButton(
+                self.btn_row,
+                text="Pratinjau PDF",
+                command=self.on_preview,
+                fg_color=THEME["btn_secondary_bg"],
+                hover_color=THEME["btn_secondary_hover"],
+                border_width=1,
+                border_color=THEME["btn_secondary_border"],
+                text_color=THEME["btn_secondary_text"],
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+                width=110,
+                height=30,
+                corner_radius=6,
+            )
+            self.btn_preview.pack(side="left")
 
     def set_file(self, file_path: str) -> None:
         self.current_path = file_path
@@ -146,29 +162,19 @@ class DocumentSourceRow(ctk.CTkFrame):
         state: Literal["ready", "warning", "error", "process", "neutral"] = "neutral",
     ) -> None:
         if state == "ready":
-            color = self.theme.status_ready
-        elif state == "warning":
-            color = self.theme.status_warning
+            color = THEME["status_ready_text"]
+        elif state in ("warning", "process", "amber"):
+            color = THEME["status_warn_text"]
         elif state == "error":
-            color = self.theme.status_error
+            color = THEME["status_error_text"]
         else:
-            color = self.theme.text_secondary
+            color = THEME["text_muted"]
 
-        self.status_label.configure(text=text, text_color=color)
+        display_text = f"• {text}" if not text.startswith("•") else text
+        self.status_label.configure(text=display_text, text_color=color)
 
     def update_theme(self, theme: ThemeTokens) -> None:
-        self.theme = theme
-        self.configure(fg_color=theme.bg_surface, border_color=theme.border_subtle)
-        self.type_label.configure(text_color=theme.text_secondary)
-        self.filename_label.configure(text_color=theme.text_primary)
-        for btn in [getattr(self, "btn_preview", None), self.btn_recheck, self.btn_browse]:
-            if btn:
-                btn.configure(
-                    fg_color=theme.btn_secondary_bg,
-                    hover_color=theme.btn_secondary_hover,
-                    border_color=theme.btn_secondary_border,
-                    text_color=theme.btn_secondary_text,
-                )
+        pass
 
 class CleanMetricBar(ctk.CTkFrame):
     """Bar horizontal 3 metrik yang bersih dengan font monospace tabular-nums."""
@@ -176,8 +182,8 @@ class CleanMetricBar(ctk.CTkFrame):
     def __init__(self, master: any, theme: ThemeTokens, **kwargs) -> None:
         super().__init__(
             master,
-            fg_color=theme.bg_surface,
-            border_color=theme.border_subtle,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=theme.corner_radius_inner,
             height=62,
@@ -198,19 +204,19 @@ class CleanMetricBar(ctk.CTkFrame):
             m1_box,
             text="WILAYAH TERPILIH",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
-            text_color=self.theme.text_secondary,
+            text_color=THEME["text_secondary"],
         )
         self.lbl_t1.pack(anchor="center")
         self.lbl_v1 = ctk.CTkLabel(
             m1_box,
             text="0 Kadus",
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=16, weight="bold"),
-            text_color=self.theme.text_primary,
+            text_color=THEME["metric_value"],
         )
         self.lbl_v1.pack(anchor="center")
 
         # Divider 1
-        div1 = ctk.CTkFrame(self, fg_color=self.theme.border_subtle, width=1)
+        div1 = ctk.CTkFrame(self, fg_color=THEME["border_surface"], width=1)
         div1.grid(row=0, column=1, sticky="ns", pady=8)
 
         # Metric 2: Total Pemilih
@@ -220,19 +226,19 @@ class CleanMetricBar(ctk.CTkFrame):
             m2_box,
             text="TOTAL PEMILIH",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
-            text_color=self.theme.text_secondary,
+            text_color=THEME["text_secondary"],
         )
         self.lbl_t2.pack(anchor="center")
         self.lbl_v2 = ctk.CTkLabel(
             m2_box,
             text="0 Orang",
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=16, weight="bold"),
-            text_color=self.theme.text_primary,
+            text_color=THEME["metric_value"],
         )
         self.lbl_v2.pack(anchor="center")
 
         # Divider 2
-        div2 = ctk.CTkFrame(self, fg_color=self.theme.border_subtle, width=1)
+        div2 = ctk.CTkFrame(self, fg_color=THEME["border_surface"], width=1)
         div2.grid(row=0, column=3, sticky="ns", pady=8)
 
         # Metric 3: Estimasi Kertas
@@ -242,14 +248,14 @@ class CleanMetricBar(ctk.CTkFrame):
             m3_box,
             text="KEBUTUHAN KERTAS",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
-            text_color=self.theme.text_secondary,
+            text_color=THEME["text_secondary"],
         )
         self.lbl_t3.pack(anchor="center")
         self.lbl_v3 = ctk.CTkLabel(
             m3_box,
             text="0 Lembar F4",
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=16, weight="bold"),
-            text_color=self.theme.text_primary,
+            text_color=THEME["metric_value"],
         )
         self.lbl_v3.pack(anchor="center")
 
@@ -259,12 +265,7 @@ class CleanMetricBar(ctk.CTkFrame):
         self.lbl_v3.configure(text=f"{total_pages:,} Lembar F4")
 
     def update_theme(self, theme: ThemeTokens) -> None:
-        self.theme = theme
-        self.configure(fg_color=theme.bg_surface, border_color=theme.border_subtle)
-        for lbl in [self.lbl_t1, self.lbl_t2, self.lbl_t3]:
-            lbl.configure(text_color=theme.text_secondary)
-        for lbl in [self.lbl_v1, self.lbl_v2, self.lbl_v3]:
-            lbl.configure(text_color=theme.text_primary)
+        pass
 
 class KadusRowItem(ctk.CTkFrame):
     """Baris Kadus interaktif dengan tombol buka PDF per wilayah."""
@@ -282,8 +283,8 @@ class KadusRowItem(ctk.CTkFrame):
     ) -> None:
         super().__init__(
             master,
-            fg_color=theme.bg_surface,
-            border_color=theme.border_subtle,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=theme.corner_radius_inner,
             height=40,
@@ -303,9 +304,10 @@ class KadusRowItem(ctk.CTkFrame):
             variable=self.checkbox_var,
             command=on_toggle,
             font=ctk.CTkFont(family=theme.font_family_main, size=12, weight="bold"),
-            fg_color=theme.primary_action,
-            hover_color=theme.primary_action_hover,
-            border_color=theme.border_subtle,
+            text_color=THEME["text_primary"],
+            fg_color=THEME["btn_primary_bg"],
+            hover_color=THEME["btn_primary_hover"],
+            border_color=THEME["border_surface"],
             corner_radius=4,
             width=140,
         )
@@ -315,7 +317,7 @@ class KadusRowItem(ctk.CTkFrame):
             self,
             text=f"{voter_count:,} Pemilih  •  {page_count:,} Lembar",
             font=ctk.CTkFont(family=theme.font_family_mono, size=11),
-            text_color=theme.text_secondary,
+            text_color=THEME["text_secondary"],
         )
         self.info_label.pack(side="left", padx=8)
 
@@ -327,22 +329,22 @@ class KadusRowItem(ctk.CTkFrame):
             self.right_frame,
             text="Buka PDF",
             command=self._open_pdf,
-            fg_color=theme.btn_secondary_bg,
-            hover_color=theme.btn_secondary_hover,
-            border_color=theme.btn_secondary_border,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_color=THEME["border_surface"],
             border_width=1,
-            text_color=theme.btn_secondary_text,
+            text_color=THEME["btn_secondary_text"],
             font=ctk.CTkFont(family=theme.font_family_main, size=10, weight="bold"),
-            width=65,
-            height=24,
-            corner_radius=4,
+            width=70,
+            height=26,
+            corner_radius=6,
         )
 
         self.status_label = ctk.CTkLabel(
             self.right_frame,
             text="• Siap",
             font=ctk.CTkFont(family=theme.font_family_main, size=11, weight="bold"),
-            text_color=theme.status_ready,
+            text_color=THEME["status_ready_text"],
         )
         self.status_label.pack(side="right")
 
@@ -356,14 +358,14 @@ class KadusRowItem(ctk.CTkFrame):
     def set_printing_active(self) -> None:
         self.status_label.configure(
             text="• Mencetak...",
-            text_color=self.theme.status_warning,
+            text_color=THEME["status_warn_text"],
         )
 
     def set_completed(self, pdf_path: str = "") -> None:
         self.generated_pdf_path = pdf_path
         self.status_label.configure(
             text="• Selesai ✓",
-            text_color=self.theme.status_ready,
+            text_color=THEME["status_ready_text"],
         )
         if pdf_path and os.path.exists(pdf_path):
             self.btn_open_pdf.pack(side="right", padx=(0, 8))
@@ -371,7 +373,7 @@ class KadusRowItem(ctk.CTkFrame):
     def set_error(self, err_text: str = "• Gagal") -> None:
         self.status_label.configure(
             text=err_text,
-            text_color=self.theme.status_error,
+            text_color=THEME["status_error_text"],
         )
 
     def reset_status(self) -> None:
@@ -379,27 +381,14 @@ class KadusRowItem(ctk.CTkFrame):
         self.btn_open_pdf.pack_forget()
         self.status_label.configure(
             text="• Siap",
-            text_color=self.theme.status_ready,
+            text_color=THEME["status_ready_text"],
         )
 
     def set_enabled(self, enabled: bool) -> None:
         self.checkbox.configure(state="normal" if enabled else "disabled")
 
     def update_theme(self, theme: ThemeTokens) -> None:
-        self.theme = theme
-        self.configure(fg_color=theme.bg_surface, border_color=theme.border_subtle)
-        self.checkbox.configure(
-            fg_color=theme.primary_action,
-            hover_color=theme.primary_action_hover,
-            border_color=theme.border_subtle,
-        )
-        self.info_label.configure(text_color=theme.text_secondary)
-        self.btn_open_pdf.configure(
-            fg_color=theme.btn_secondary_bg,
-            hover_color=theme.btn_secondary_hover,
-            border_color=theme.btn_secondary_border,
-            text_color=theme.btn_secondary_text,
-        )
+        pass
 
 # Alias for backwards compatibility
 KadusItemRow = KadusRowItem
@@ -410,8 +399,8 @@ class VoterPreviewTable(ctk.CTkFrame):
     def __init__(self, master: any, theme: ThemeTokens, **kwargs) -> None:
         super().__init__(
             master,
-            fg_color=theme.bg_surface,
-            border_color=theme.border_subtle,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=theme.corner_radius_inner,
             **kwargs,
@@ -425,20 +414,29 @@ class VoterPreviewTable(ctk.CTkFrame):
         self.header_row = ctk.CTkFrame(self, fg_color="transparent", height=28)
         self.header_row.pack(fill="x", padx=10, pady=(8, 4))
 
-        cols = [("NO", 40), ("NAMA PEMILIH", 170), ("L/P", 80), ("UMUR", 70), ("ALAMAT & WILAYAH", 240)]
+        cols = [("NO", 40), ("NAMA PEMILIH", 170), ("L/P", 85), ("UMUR", 75)]
         for title, width in cols:
             lbl = ctk.CTkLabel(
                 self.header_row,
                 text=title,
                 font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
-                text_color=self.theme.text_muted,
+                text_color=THEME["text_muted"],
                 width=width,
                 anchor="w",
             )
             lbl.pack(side="left", padx=4)
 
+        lbl_addr = ctk.CTkLabel(
+            self.header_row,
+            text="ALAMAT & WILAYAH",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
+            text_color=THEME["text_muted"],
+            anchor="w",
+        )
+        lbl_addr.pack(side="left", fill="x", expand=True, padx=4)
+
         # Hairline separator
-        self.divider = ctk.CTkFrame(self, fg_color=self.theme.border_subtle, height=1)
+        self.divider = ctk.CTkFrame(self, fg_color=THEME["border_surface"], height=1)
         self.divider.pack(fill="x", padx=6, pady=2)
 
         # Rows Container
@@ -449,7 +447,7 @@ class VoterPreviewTable(ctk.CTkFrame):
             self.rows_container,
             text="Belum ada data pemilih. Silakan scan berkas Excel DPT terlebih dahulu.",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.text_muted,
+            text_color=THEME["text_muted"],
         )
         self.empty_label.pack(pady=24)
 
@@ -462,7 +460,7 @@ class VoterPreviewTable(ctk.CTkFrame):
                 self.rows_container,
                 text="Tidak ada pemilih untuk ditampilkan.",
                 font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-                text_color=self.theme.text_muted,
+                text_color=THEME["text_muted"],
             )
             self.empty_label.pack(pady=24)
             return
@@ -475,7 +473,7 @@ class VoterPreviewTable(ctk.CTkFrame):
                 row,
                 text=voter.nomor,
                 font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
-                text_color=self.theme.text_secondary,
+                text_color=THEME["text_secondary"],
                 width=40,
                 anchor="w",
             )
@@ -485,7 +483,7 @@ class VoterPreviewTable(ctk.CTkFrame):
                 row,
                 text=voter.nama,
                 font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-                text_color=self.theme.text_primary,
+                text_color=THEME["text_primary"],
                 width=170,
                 anchor="w",
             )
@@ -495,8 +493,8 @@ class VoterPreviewTable(ctk.CTkFrame):
                 row,
                 text=voter.jenis_kelamin,
                 font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-                text_color=self.theme.text_secondary,
-                width=80,
+                text_color=THEME["text_secondary"],
+                width=85,
                 anchor="w",
             )
             c3.pack(side="left", padx=4)
@@ -505,8 +503,8 @@ class VoterPreviewTable(ctk.CTkFrame):
                 row,
                 text=voter.umur,
                 font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
-                text_color=self.theme.text_secondary,
-                width=70,
+                text_color=THEME["text_secondary"],
+                width=75,
                 anchor="w",
             )
             c4.pack(side="left", padx=4)
@@ -516,16 +514,13 @@ class VoterPreviewTable(ctk.CTkFrame):
                 row,
                 text=alamat_wilayah,
                 font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-                text_color=self.theme.text_secondary,
-                width=240,
+                text_color=THEME["text_secondary"],
                 anchor="w",
             )
-            c5.pack(side="left", padx=4)
+            c5.pack(side="left", fill="x", expand=True, padx=4)
 
     def update_theme(self, theme: ThemeTokens) -> None:
-        self.theme = theme
-        self.configure(fg_color=theme.bg_surface, border_color=theme.border_subtle)
-        self.divider.configure(fg_color=theme.border_subtle)
+        pass
 
 class MetricCard(ctk.CTkFrame):
     """Kartu metrik mandiri (kompatibilitas)."""
@@ -533,8 +528,8 @@ class MetricCard(ctk.CTkFrame):
     def __init__(self, master: any, title: str, value: str, theme: ThemeTokens, **kwargs) -> None:
         super().__init__(
             master,
-            fg_color=theme.bg_surface,
-            border_color=theme.border_subtle,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=theme.corner_radius_inner,
             **kwargs,
@@ -544,14 +539,14 @@ class MetricCard(ctk.CTkFrame):
             self,
             text=title,
             font=ctk.CTkFont(family=theme.font_family_main, size=10, weight="bold"),
-            text_color=theme.text_secondary,
+            text_color=THEME["text_secondary"],
         )
         self.title_label.pack(anchor="w", padx=12, pady=(8, 2))
         self.value_label = ctk.CTkLabel(
             self,
             text=value,
             font=ctk.CTkFont(family=theme.font_family_mono, size=18, weight="bold"),
-            text_color=theme.text_primary,
+            text_color=THEME["metric_value"],
         )
         self.value_label.pack(anchor="w", padx=12, pady=(0, 8))
 
@@ -559,42 +554,37 @@ class MetricCard(ctk.CTkFrame):
         self.value_label.configure(text=value)
 
     def update_theme(self, theme: ThemeTokens) -> None:
-        self.theme = theme
-        self.configure(fg_color=theme.bg_surface, border_color=theme.border_subtle)
-        self.title_label.configure(text_color=theme.text_secondary)
-        self.value_label.configure(text_color=theme.text_primary)
+        pass
 
 class StatusBadge(ctk.CTkFrame):
     """Badge status minimalis."""
 
     def __init__(self, master: any, text: str, status: str, theme: ThemeTokens, **kwargs) -> None:
-        super().__init__(master, corner_radius=6, height=26, fg_color=theme.bg_surface, **kwargs)
+        super().__init__(master, corner_radius=6, height=26, fg_color=THEME["bg_surface"], border_color=THEME["border_surface"], border_width=1, **kwargs)
         self.theme = theme
         self.label = ctk.CTkLabel(
             self,
             text=text,
             font=ctk.CTkFont(family=theme.font_family_mono, size=11, weight="bold"),
-            text_color=theme.text_primary,
+            text_color=THEME["text_primary"],
         )
         self.label.pack(padx=8, pady=3)
         self.set_status(text, status)
 
     def set_status(self, text: str, status: str) -> None:
         if status == "ready":
-            color = self.theme.status_ready
-        elif status in ("process", "amber"):
-            color = self.theme.status_warning
+            color = THEME["status_ready_text"]
+        elif status in ("process", "amber", "warning"):
+            color = THEME["status_warn_text"]
         elif status == "error":
-            color = self.theme.status_error
+            color = THEME["status_error_text"]
         else:
-            color = self.theme.text_secondary
+            color = THEME["text_secondary"]
 
         self.label.configure(text=text, text_color=color)
 
     def update_theme(self, theme: ThemeTokens, current_status: str = "neutral") -> None:
-        self.theme = theme
-        self.configure(fg_color=theme.bg_surface)
-        self.set_status(self.label.cget("text"), current_status)
+        pass
 
 class AboutModal(ctk.CTkToplevel):
     def __init__(self, master: any, theme: ThemeTokens) -> None:
@@ -604,7 +594,7 @@ class AboutModal(ctk.CTkToplevel):
         self.title("Tentang VoterMail Engine")
         self.geometry("620x640")
         self.minsize(560, 500)
-        self.configure(fg_color=theme.bg_root)
+        self.configure(fg_color=THEME["bg_root"])
 
         self.transient(master)
         self.grab_set()
@@ -627,8 +617,8 @@ class AboutModal(ctk.CTkToplevel):
     def _build_ui(self) -> None:
         content_frame = ctk.CTkFrame(
             self,
-            fg_color=self.theme.bg_card,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_card"],
+            border_color=THEME["border_card"],
             border_width=1,
             corner_radius=self.theme.corner_radius_card,
         )
@@ -645,14 +635,14 @@ class AboutModal(ctk.CTkToplevel):
             title_row,
             text=__app_name__,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=20, weight="bold"),
-            text_color=self.theme.text_primary,
+            text_color=THEME["text_primary"],
         )
         app_title.pack(side="left")
 
         v_pill = ctk.CTkFrame(
             title_row,
-            fg_color=self.theme.bg_surface,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=6,
         )
@@ -661,22 +651,22 @@ class AboutModal(ctk.CTkToplevel):
             v_pill,
             text=f"v{__version__}",
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=11, weight="bold"),
-            text_color=self.theme.status_ready,
+            text_color=THEME["status_ready_text"],
         ).pack(padx=8, pady=2)
 
         app_desc = ctk.CTkLabel(
             header_frame,
             text="Otomasi Cetak Surat Pemberitahuan Pemilih (Model C6) Pilkades",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.text_secondary,
+            text_color=THEME["text_secondary"],
         )
         app_desc.pack(anchor="w", pady=(2, 0))
 
         # Author Card
         dev_card = ctk.CTkFrame(
             content_frame,
-            fg_color=self.theme.bg_surface,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
         )
@@ -692,7 +682,7 @@ class AboutModal(ctk.CTkToplevel):
             dev_info_left,
             text=f"Pengembang: {__author__} (@{__github_user__})",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
-            text_color=self.theme.text_primary,
+            text_color=THEME["text_primary"],
         )
         dev_title.pack(anchor="w")
 
@@ -700,7 +690,7 @@ class AboutModal(ctk.CTkToplevel):
             dev_info_left,
             text=__license__,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=10),
-            text_color=self.theme.text_muted,
+            text_color=THEME["text_muted"],
         )
         lic_label.pack(anchor="w", pady=(2, 0))
 
@@ -708,11 +698,11 @@ class AboutModal(ctk.CTkToplevel):
             dev_row,
             text="GitHub",
             command=lambda: webbrowser.open(__repository__),
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_color=THEME["border_surface"],
             border_width=1,
-            text_color=self.theme.btn_secondary_text,
+            text_color=THEME["btn_secondary_text"],
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
             height=28,
             corner_radius=6,
@@ -724,14 +714,14 @@ class AboutModal(ctk.CTkToplevel):
             content_frame,
             text="Riwayat Pembaruan Fitur",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            text_color=self.theme.text_primary,
+            text_color=THEME["text_primary"],
         )
         hist_title.pack(anchor="w", padx=16, pady=(10, 4))
 
         hist_scroll = ctk.CTkScrollableFrame(
             content_frame,
-            fg_color=self.theme.bg_surface,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
             height=260,
@@ -742,11 +732,11 @@ class AboutModal(ctk.CTkToplevel):
             content_frame,
             text="Tutup",
             height=32,
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_color=THEME["border_surface"],
             border_width=1,
-            text_color=self.theme.btn_secondary_text,
+            text_color=THEME["btn_secondary_text"],
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
             corner_radius=self.theme.corner_radius_inner,
             command=self.destroy,
@@ -764,7 +754,7 @@ class AboutModal(ctk.CTkToplevel):
                 top,
                 text=f"v{feat.get('version', '')}",
                 font=ctk.CTkFont(family=self.theme.font_family_mono, size=11, weight="bold"),
-                text_color=self.theme.status_ready,
+                text_color=THEME["status_ready_text"],
             )
             v_lbl.pack(side="left")
 
@@ -772,7 +762,7 @@ class AboutModal(ctk.CTkToplevel):
                 top,
                 text=f"— {feat.get('title', '')}",
                 font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-                text_color=self.theme.text_primary,
+                text_color=THEME["text_primary"],
             )
             t_lbl.pack(side="left", padx=4)
 
@@ -780,7 +770,7 @@ class AboutModal(ctk.CTkToplevel):
                 top,
                 text=feat.get("date", ""),
                 font=ctk.CTkFont(family=self.theme.font_family_mono, size=10),
-                text_color=self.theme.text_muted,
+                text_color=THEME["text_muted"],
             )
             d_lbl.pack(side="right")
 
@@ -790,7 +780,7 @@ class AboutModal(ctk.CTkToplevel):
                     item,
                     text=desc,
                     font=ctk.CTkFont(family=self.theme.font_family_main, size=10),
-                    text_color=self.theme.text_secondary,
+                    text_color=THEME["text_secondary"],
                     wraplength=480,
                     justify="left",
                 ).pack(anchor="w", pady=(1, 0))

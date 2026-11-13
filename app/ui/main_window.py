@@ -24,7 +24,7 @@ from app.config.settings import (
     OUTPUT_DIR,
     TEMP_DIR,
 )
-from app.config.theme import DARK_THEME, LIGHT_THEME, ThemeTokens, get_theme
+from app.config.theme import DARK_THEME, LIGHT_THEME, ThemeTokens, get_theme, THEME
 from app.config.version import (
     __app_name__,
     __author__,
@@ -82,7 +82,7 @@ class MainWindow(ctk.CTk):
         self.title("VoterMail Engine — Otomasi Surat Pemberitahuan Pemilih")
         self.geometry("1340x940")
         self.minsize(1180, 820)
-        self.configure(fg_color=self.theme.bg_root)
+        self.configure(fg_color=THEME["bg_root"])
 
         self.worker_queue: queue.Queue[tuple[str, Any]] = queue.Queue()
         self.cancel_event = threading.Event()
@@ -146,8 +146,8 @@ class MainWindow(ctk.CTk):
         # Header Container
         self.header_frame = ctk.CTkFrame(
             self,
-            fg_color=self.theme.bg_card,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_card"],
+            border_color=THEME["border_card"],
             border_width=1,
             corner_radius=0,
             height=64,
@@ -164,7 +164,7 @@ class MainWindow(ctk.CTk):
             title_top,
             text=f"{__app_name__}",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=16, weight="bold"),
-            text_color=self.theme.text_primary,
+            text_color=THEME["text_primary"],
         )
         app_title.pack(side="left")
 
@@ -180,58 +180,67 @@ class MainWindow(ctk.CTk):
             title_container,
             text="Otomasi Surat Pemberitahuan Pemilih Pilkades Karangjengkol",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.text_secondary,
+            text_color=THEME["text_secondary"],
         )
         app_sub.pack(anchor="w")
 
         header_right = ctk.CTkFrame(self.header_frame, fg_color="transparent")
         header_right.pack(side="right", padx=20, pady=10)
 
+        current_val = "☾ Gelap" if self.cfg.theme_mode.lower() == "dark" else "☀ Terang"
         self.theme_segment = ctk.CTkSegmentedButton(
             header_right,
-            values=["Dark", "Light"],
+            values=["☀ Terang", "☾ Gelap"],
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
             command=self._on_theme_toggled,
-            width=110,
-            height=28,
+            height=32,
+            corner_radius=8,
+            fg_color=THEME["bg_surface"],
+            selected_color="#2563EB",
+            selected_hover_color="#1D4ED8",
+            unselected_color=THEME["bg_surface"],
+            unselected_hover_color=THEME["btn_secondary_hover"],
+            text_color=THEME["text_primary"],
         )
-        self.theme_segment.set(self.theme.name)
+        self.theme_segment.set(current_val)
         self.theme_segment.pack(side="left", padx=(0, 10))
 
         self.btn_about = ctk.CTkButton(
             header_right,
             text="Tentang & Credit",
             command=self._open_about_modal,
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_color=THEME["border_surface"],
             border_width=1,
-            text_color=self.theme.btn_secondary_text,
+            text_color=THEME["btn_secondary_text"],
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            height=28,
-            corner_radius=6,
+            height=32,
+            corner_radius=8,
         )
         self.btn_about.pack(side="left", padx=(0, 10))
 
         sec_pill = ctk.CTkFrame(
             header_right,
-            fg_color="#064E3B",
-            corner_radius=6,
-            height=28,
+            fg_color=THEME["status_ready_bg"],
+            border_color=THEME["border_surface"],
+            border_width=1,
+            corner_radius=8,
+            height=32,
         )
         sec_pill.pack(side="left")
         ctk.CTkLabel(
             sec_pill,
             text="Zero PII Leak • 100% Offline",
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=11, weight="bold"),
-            text_color="#34D399",
-        ).pack(padx=10, pady=4)
+            text_color=THEME["status_ready_text"],
+        ).pack(padx=10, pady=5)
 
         # Footer Bar: Author Credits & Quick Links
         self.footer_frame = ctk.CTkFrame(
             self,
-            fg_color=self.theme.bg_card,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_card"],
+            border_color=THEME["border_card"],
             border_width=1,
             corner_radius=0,
             height=36,
@@ -245,7 +254,7 @@ class MainWindow(ctk.CTk):
             footer_left,
             text=f"{__app_name__} v{__version__} • Dikembangkan oleh {__author__}",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.text_secondary,
+            text_color=THEME["text_secondary"],
         )
         lbl_footer_info.pack(side="left")
 
@@ -256,14 +265,14 @@ class MainWindow(ctk.CTk):
             footer_right,
             text="100% Pemrosesan Lokal & Aman • GitHub (@Smurffahh)",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.text_secondary,
+            text_color=THEME["text_secondary"],
             cursor="hand2",
         )
         lbl_footer_sec.pack(side="left")
         lbl_footer_sec.bind("<Button-1>", lambda _: webbrowser.open(__repository__))
 
         # Main Workspace Container: 2-Column Responsive Layout without nested outer scrollbars
-        main_body = ctk.CTkFrame(self, fg_color=self.theme.bg_root)
+        main_body = ctk.CTkFrame(self, fg_color=THEME["bg_root"])
         main_body.pack(fill="both", expand=True, padx=14, pady=(10, 6))
 
         # Left Column (approx 46% width): Source Preparation & Kadus Selection
@@ -283,8 +292,8 @@ class MainWindow(ctk.CTk):
     def _build_card_sources(self, parent: ctk.CTkFrame) -> None:
         self.card_sources = ctk.CTkFrame(
             parent,
-            fg_color=self.theme.bg_card,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_card"],
+            border_color=THEME["border_card"],
             border_width=1,
             corner_radius=self.theme.corner_radius_card,
         )
@@ -297,7 +306,7 @@ class MainWindow(ctk.CTk):
             header,
             text="1. Sumber Dokumen",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
-            text_color=self.theme.text_primary,
+            text_color=THEME["text_primary"],
         ).pack(side="left")
 
         self.doc_row_word = DocumentSourceRow(
@@ -326,8 +335,8 @@ class MainWindow(ctk.CTk):
     def _build_card_kadus(self, parent: ctk.CTkFrame) -> None:
         self.card_kadus = ctk.CTkFrame(
             parent,
-            fg_color=self.theme.bg_card,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_card"],
+            border_color=THEME["border_card"],
             border_width=1,
             corner_radius=self.theme.corner_radius_card,
         )
@@ -340,7 +349,7 @@ class MainWindow(ctk.CTk):
             header,
             text="2. Pilih Wilayah Cetak (Kadus / RW)",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
-            text_color=self.theme.text_primary,
+            text_color=THEME["text_primary"],
         ).pack(side="left")
 
         btn_box = ctk.CTkFrame(header, fg_color="transparent")
@@ -350,14 +359,14 @@ class MainWindow(ctk.CTk):
             btn_box,
             text="Pilih Semua",
             width=76,
-            height=26,
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
+            height=28,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=6,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.btn_secondary_text,
+            text_color=THEME["btn_secondary_text"],
             command=self._select_all_sheets,
         )
         self.btn_select_all.pack(side="left", padx=(0, 6))
@@ -366,14 +375,14 @@ class MainWindow(ctk.CTk):
             btn_box,
             text="Reset",
             width=64,
-            height=26,
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
+            height=28,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=6,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.btn_secondary_text,
+            text_color=THEME["btn_secondary_text"],
             command=self._deselect_all_sheets,
         )
         self.btn_deselect_all.pack(side="left")
@@ -383,8 +392,8 @@ class MainWindow(ctk.CTk):
 
         self.sheets_scroll_frame = ctk.CTkScrollableFrame(
             self.card_kadus,
-            fg_color=self.theme.bg_surface,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
         )
@@ -394,7 +403,7 @@ class MainWindow(ctk.CTk):
             self.card_kadus,
             text="Belum ada file Excel yang dipindai.",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.text_muted,
+            text_color=THEME["text_muted"],
             anchor="w",
         )
         self.excel_status_bar.pack(fill="x", padx=14, pady=(0, 10))
@@ -402,8 +411,8 @@ class MainWindow(ctk.CTk):
     def _build_card_exec(self, parent: ctk.CTkFrame) -> None:
         self.card_exec = ctk.CTkFrame(
             parent,
-            fg_color=self.theme.bg_card,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_card"],
+            border_color=THEME["border_card"],
             border_width=1,
             corner_radius=self.theme.corner_radius_card,
         )
@@ -416,7 +425,7 @@ class MainWindow(ctk.CTk):
             header,
             text="3. Pengaturan & Cetak PDF",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
-            text_color=self.theme.text_primary,
+            text_color=THEME["text_primary"],
         ).pack(side="left")
 
         self.badge_mailing = StatusBadge(header, "Menunggu Word & Excel", "neutral", self.theme)
@@ -429,18 +438,18 @@ class MainWindow(ctk.CTk):
             out_row,
             text="Folder Hasil PDF:",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            text_color=self.theme.text_secondary,
+            text_color=THEME["text_secondary"],
         ).pack(side="left", padx=(0, 8))
 
         self.output_entry = ctk.CTkEntry(
             out_row,
             placeholder_text="Pilih direktori output...",
-            fg_color=self.theme.bg_surface,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
-            text_color=self.theme.text_primary,
+            text_color=THEME["text_primary"],
             height=30,
         )
         self.output_entry.pack(side="left", fill="x", expand=True, padx=(0, 6))
@@ -451,13 +460,13 @@ class MainWindow(ctk.CTk):
             text="Ubah Folder",
             width=86,
             height=30,
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            text_color=self.theme.btn_secondary_text,
+            text_color=THEME["btn_secondary_text"],
             command=self._browse_output_dir,
         )
         self.btn_browse_output.pack(side="left", padx=(0, 6))
@@ -467,13 +476,13 @@ class MainWindow(ctk.CTk):
             text="Buka Folder",
             width=86,
             height=30,
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            text_color=self.theme.btn_secondary_text,
+            text_color=THEME["btn_secondary_text"],
             command=self._open_output_dir,
         )
         self.btn_open_output.pack(side="left")
@@ -488,7 +497,7 @@ class MainWindow(ctk.CTk):
             addr_box,
             text="Format Alamat:",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            text_color=self.theme.text_secondary,
+            text_color=THEME["text_secondary"],
         ).pack(side="left", padx=(0, 8))
 
         self.address_mode_menu = ctk.CTkOptionMenu(
@@ -496,11 +505,15 @@ class MainWindow(ctk.CTk):
             values=["Lengkap (Alamat, RT / RW)", "Hanya Alamat"],
             width=210,
             height=28,
-            fg_color=self.theme.bg_surface,
-            button_color=self.theme.border_subtle,
+            fg_color=THEME["btn_secondary_bg"],
+            button_color=THEME["btn_secondary_hover"],
+            button_hover_color=THEME["btn_secondary_hover"],
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=self.theme.text_primary,
+            text_color=THEME["text_primary"],
+            dropdown_fg_color=THEME["bg_card"],
+            dropdown_text_color=THEME["text_primary"],
+            dropdown_hover_color=THEME["bg_hover"],
             command=lambda _: self._save_active_config(),
         )
         self.address_mode_menu.set(self.cfg.address_mode)
@@ -513,8 +526,8 @@ class MainWindow(ctk.CTk):
             verify_box,
             text="Periksa Keakuratan PDF Otomatis",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            text_color=self.theme.text_primary,
-            progress_color=self.theme.primary_action,
+            text_color=THEME["text_primary"],
+            progress_color=THEME["btn_primary_bg"],
             command=self._save_active_config,
         )
         if self.cfg.enable_pdf_verification:
@@ -530,11 +543,11 @@ class MainWindow(ctk.CTk):
             btn_action_row,
             text="Buat File PDF Sekarang",
             height=38,
-            fg_color=self.theme.primary_action,
-            hover_color=self.theme.primary_action_hover,
+            fg_color=THEME["btn_disabled_bg"],
+            hover_color=THEME["btn_primary_hover"],
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
-            text_color="#FFFFFF",
+            text_color=THEME["btn_disabled_text"],
             state="disabled",
             command=self._start_mailing_process,
         )
@@ -545,13 +558,13 @@ class MainWindow(ctk.CTk):
             text="Batalkan",
             width=100,
             height=38,
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.danger_action_hover,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["btn_disabled_bg"],
+            hover_color=THEME["btn_danger_hover"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=12, weight="bold"),
-            text_color=self.theme.text_muted,
+            text_color=THEME["btn_disabled_text"],
             state="disabled",
             command=self._cancel_mailing,
         )
@@ -559,8 +572,8 @@ class MainWindow(ctk.CTk):
 
         prog_box = ctk.CTkFrame(
             self.card_exec,
-            fg_color=self.theme.bg_surface,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_elevated"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
         )
@@ -573,8 +586,8 @@ class MainWindow(ctk.CTk):
             prog_inner,
             height=10,
             corner_radius=5,
-            progress_color=self.theme.primary_action,
-            fg_color=self.theme.border_subtle,
+            progress_color=THEME["btn_primary_bg"],
+            fg_color=THEME["border_card"],
         )
         self.progress_bar.set(0.0)
         self.progress_bar.pack(fill="x", pady=(0, 6))
@@ -586,7 +599,7 @@ class MainWindow(ctk.CTk):
             stats_row,
             text="Siap Memproses: 0 Pemilih",
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=11, weight="bold"),
-            text_color=self.theme.text_primary,
+            text_color=THEME["text_primary"],
         )
         self.status_detail_label.pack(side="left")
 
@@ -594,15 +607,15 @@ class MainWindow(ctk.CTk):
             stats_row,
             text="Estimasi Sisa Waktu: -",
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
-            text_color=self.theme.text_secondary,
+            text_color=THEME["text_secondary"],
         )
         self.eta_label.pack(side="right")
 
     def _build_card_activity(self, parent: ctk.CTkFrame) -> None:
         self.card_activity = ctk.CTkFrame(
             parent,
-            fg_color=self.theme.bg_card,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_card"],
+            border_color=THEME["border_card"],
             border_width=1,
             corner_radius=self.theme.corner_radius_card,
         )
@@ -615,7 +628,7 @@ class MainWindow(ctk.CTk):
             header,
             text="Ringkasan Data & Aktivitas",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
-            text_color=self.theme.text_primary,
+            text_color=THEME["text_primary"],
         ).pack(side="left")
 
         ctrl_right = ctk.CTkFrame(header, fg_color="transparent")
@@ -626,7 +639,14 @@ class MainWindow(ctk.CTk):
             values=["Pratinjau Pemilih", "Hasil Cek PDF", "Log Sistem"],
             font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
             command=self._on_activity_tab_selected,
-            height=26,
+            height=28,
+            corner_radius=6,
+            fg_color=THEME["bg_surface"],
+            selected_color="#2563EB",
+            selected_hover_color="#1D4ED8",
+            unselected_color=THEME["bg_surface"],
+            unselected_hover_color=THEME["btn_secondary_hover"],
+            text_color=THEME["text_primary"],
         )
         self.activity_tabs.set("Pratinjau Pemilih")
         self.activity_tabs.pack(side="left", padx=(0, 8))
@@ -635,14 +655,14 @@ class MainWindow(ctk.CTk):
             ctrl_right,
             text="Bersihkan",
             width=70,
-            height=26,
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
+            height=28,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=6,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=10),
-            text_color=self.theme.btn_secondary_text,
+            text_color=THEME["btn_secondary_text"],
             command=self._clear_logs,
         )
         self.btn_clear_log.pack(side="left")
@@ -654,23 +674,23 @@ class MainWindow(ctk.CTk):
 
         self.audit_textbox = ctk.CTkTextbox(
             self.activity_content_frame,
-            fg_color=self.theme.bg_surface,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
-            text_color=self.theme.text_primary,
+            text_color=THEME["text_primary"],
             wrap="char",
         )
 
         self.log_textbox = ctk.CTkTextbox(
             self.activity_content_frame,
-            fg_color=self.theme.bg_surface,
-            border_color=self.theme.border_subtle,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
-            text_color=self.theme.text_primary,
+            text_color=THEME["text_primary"],
             wrap="char",
         )
 
@@ -725,84 +745,13 @@ class MainWindow(ctk.CTk):
         save_app_config(self.cfg)
 
     def _on_theme_toggled(self, val: str) -> None:
-        self.theme = get_theme(val)
-        ctk.set_appearance_mode(self.theme.name)
-        self.configure(fg_color=self.theme.bg_root)
-        self.cfg.theme_mode = self.theme.name
+        mode = "Dark" if "gelap" in val.lower() or val.lower() == "dark" else "Light"
+        ctk.set_appearance_mode(mode)
+        self.theme = get_theme(mode)
+        self.cfg.theme_mode = mode
         save_app_config(self.cfg)
-
-        self.header_frame.configure(fg_color=self.theme.bg_card, border_color=self.theme.border_subtle)
-        self.footer_frame.configure(fg_color=self.theme.bg_card, border_color=self.theme.border_subtle)
-        self.card_sources.configure(fg_color=self.theme.bg_card, border_color=self.theme.border_subtle)
-        self.card_kadus.configure(fg_color=self.theme.bg_card, border_color=self.theme.border_subtle)
-        self.card_exec.configure(fg_color=self.theme.bg_card, border_color=self.theme.border_subtle)
-        self.card_activity.configure(fg_color=self.theme.bg_card, border_color=self.theme.border_subtle)
-
-        self.doc_row_word.update_theme(self.theme)
-        self.doc_row_excel.update_theme(self.theme)
-        self.metric_bar.update_theme(self.theme)
-        self.sheets_scroll_frame.configure(fg_color=self.theme.bg_surface, border_color=self.theme.border_subtle)
-        for row in self.kadus_rows.values():
-            row.update_theme(self.theme)
-
-        self.voter_table.update_theme(self.theme)
-        self.audit_textbox.configure(
-            fg_color=self.theme.bg_surface,
-            border_color=self.theme.border_subtle,
-            text_color=self.theme.text_primary,
-        )
-        self.log_textbox.configure(
-            fg_color=self.theme.bg_surface,
-            border_color=self.theme.border_subtle,
-            text_color=self.theme.text_primary,
-        )
-
-        self.output_entry.configure(
-            fg_color=self.theme.bg_surface,
-            border_color=self.theme.border_subtle,
-            text_color=self.theme.text_primary,
-        )
-        self.btn_browse_output.configure(
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
-            text_color=self.theme.btn_secondary_text,
-        )
-        self.btn_open_output.configure(
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
-            text_color=self.theme.btn_secondary_text,
-        )
-        self.btn_clear_log.configure(
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
-            text_color=self.theme.btn_secondary_text,
-        )
-        self.btn_select_all.configure(
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
-            text_color=self.theme.btn_secondary_text,
-        )
-        self.btn_deselect_all.configure(
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
-            text_color=self.theme.btn_secondary_text,
-        )
-        self.btn_about.configure(
-            fg_color=self.theme.btn_secondary_bg,
-            hover_color=self.theme.btn_secondary_hover,
-            border_color=self.theme.btn_secondary_border,
-            text_color=self.theme.btn_secondary_text,
-        )
-        self.badge_version.update_theme(self.theme)
-        self.badge_mailing.update_theme(self.theme)
-
         self._check_ready_state()
-        self._log(f"[TEMA] Mengganti tema visual ke: {self.theme.name}")
+        self._log(f"[TEMA] Mengganti tema visual ke: {mode}")
 
     def _log(self, text: str, category: str = "all") -> None:
         timestamp = time.strftime("%H:%M:%S")
@@ -1068,25 +1017,25 @@ class MainWindow(ctk.CTk):
             self.btn_start.configure(
                 state="normal",
                 text="Buat File PDF Sekarang",
-                fg_color=self.theme.primary_action,
-                hover_color=self.theme.primary_action_hover,
-                text_color="#FFFFFF",
+                fg_color=THEME["btn_primary_bg"],
+                hover_color=THEME["btn_primary_hover"],
+                text_color=THEME["btn_primary_text"],
             )
             self.badge_mailing.set_status("Siap Mailing", "ready")
         elif selected_count == 0 and self.word_ready and self.excel_ready:
             self.btn_start.configure(
                 state="disabled",
                 text="Pilih Minimal 1 Sheet Kadus",
-                fg_color=self.theme.btn_secondary_bg,
-                text_color=self.theme.text_muted,
+                fg_color=THEME["btn_disabled_bg"],
+                text_color=THEME["btn_disabled_text"],
             )
             self.badge_mailing.set_status("Pilih Kadus", "neutral")
         else:
             self.btn_start.configure(
                 state="disabled",
                 text="Buat File PDF Sekarang",
-                fg_color=self.theme.btn_secondary_bg,
-                text_color=self.theme.text_muted,
+                fg_color=THEME["btn_disabled_bg"],
+                text_color=THEME["btn_disabled_text"],
             )
             self.badge_mailing.set_status("Menunggu Word & Excel", "neutral")
 
@@ -1147,14 +1096,14 @@ class MainWindow(ctk.CTk):
         self.btn_start.configure(
             state="disabled",
             text="Sedang Memproses Mailing...",
-            fg_color=self.theme.btn_secondary_bg,
-            text_color=self.theme.text_muted,
+            fg_color=THEME["btn_disabled_bg"],
+            text_color=THEME["btn_disabled_text"],
         )
         self.btn_cancel.configure(
             state="normal",
-            fg_color=self.theme.danger_action,
-            hover_color=self.theme.danger_action_hover,
-            text_color="#FFFFFF",
+            fg_color=THEME["btn_danger_bg"],
+            hover_color=THEME["btn_danger_hover"],
+            text_color=THEME["btn_danger_text"],
         )
         for row in self.kadus_rows.values():
             row.set_enabled(False)
@@ -1325,8 +1274,8 @@ class MainWindow(ctk.CTk):
         self.is_processing = False
         self.btn_cancel.configure(
             state="disabled",
-            fg_color=self.theme.btn_secondary_bg,
-            text_color=self.theme.text_muted,
+            fg_color=THEME["btn_disabled_bg"],
+            text_color=THEME["btn_disabled_text"],
             text="Batalkan",
         )
         for row in self.kadus_rows.values():
