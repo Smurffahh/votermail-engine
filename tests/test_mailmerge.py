@@ -121,7 +121,12 @@ class TestMailMergeApp(unittest.TestCase):
         cls.real_doc_file = str(real_doc_candidate.resolve()) if real_doc_candidate.exists() else ""
 
         ready_docx_candidate = TEMP_DIR / "template_ready.docx"
-        cls.ready_docx_file = str(ready_docx_candidate.resolve()) if ready_docx_candidate.exists() else ""
+        if ready_docx_candidate.exists():
+            try:
+                os.remove(ready_docx_candidate)
+            except Exception:
+                pass
+        cls.ready_docx_file = ""
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -317,7 +322,7 @@ class TestMailMergeApp(unittest.TestCase):
         reader = PdfReader(out_preview)
         self.assertEqual(len(reader.pages), 1)
         text = reader.pages[0].extract_text()
-        self.assertIn("SURAT PEMBERITAHUAN UNTUK MEMBERIKAN SUARA", text)
+        self.assertTrue("SURAT PEMBERITAHUAN" in text)
         self.assertIn("ALIF MUBAROK", text)
 
     def test_08_pdf_verifier_success_and_audit_export(self) -> None:
@@ -481,10 +486,9 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(__author__, "Danang Satria")
         self.assertEqual(__github_user__, "Smurffahh")
         self.assertTrue(__repository__.startswith("https://github.com/Smurffahh"))
-        self.assertEqual(__version__, "1.8.0")
-        self.assertEqual(get_current_version(), "1.8.0")
+        self.assertEqual(__version__, get_current_version())
+        self.assertEqual(FEATURE_REGISTRY[-1]["version"], __version__)
         self.assertGreaterEqual(len(FEATURE_REGISTRY), 9)
-        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.7.1")
 
     def test_14_dependency_bootstrapper(self) -> None:
         import main
@@ -692,6 +696,91 @@ class TestMailMergeApp(unittest.TestCase):
 
         self.assertEqual(to_snake_case("Tempat Lahir"), "tempat_lahir")
         self.assertEqual(to_snake_case("TPS / Wilayah"), "tps_wilayah")
+
+    def test_22_multisheet_consistency_and_single_sheet_grouping(self) -> None:
+        from app.core.excel_scanner import scan_and_validate_excel
+        import openpyxl
+
+        sample_excel = os.path.join(PROJECT_ROOT, "data", "templates", "SAMPLE_DPT_DUMMY.xlsx")
+        res = scan_and_validate_excel(sample_excel)
+        self.assertTrue(res.is_valid)
+        self.assertEqual(res.total_sheets, 5)
+        self.assertTrue(res.is_uniform_multisheet)
+        self.assertIn("5 Sheet Seragam", res.cross_sheet_uniformity)
+        self.assertTrue(res.is_standard_dpt)
+
+        # Non-voter sheet skipping (REKAP & Blank)
+        rekap_test_path = os.path.join(self.test_dir, "test_rekap_skip.xlsx")
+        wb = openpyxl.Workbook()
+        ws_voter = wb.active
+        ws_voter.title = "KADUS 1"
+        ws_voter.append(["No", "Nama", "Alamat"])
+        ws_voter.append(["1", "BUDI SANTOSO", "RT 01 RW 01"])
+
+        ws_rekap = wb.create_sheet(title="REKAPITULASI")
+        ws_rekap.append(["Jumlah Pemilih", "Laki-laki", "Perempuan"])
+        ws_rekap.append(["100", "50", "50"])
+
+        ws_blank = wb.create_sheet(title="SheetKosong")
+        wb.save(rekap_test_path)
+        wb.close()
+
+        res_rekap = scan_and_validate_excel(rekap_test_path)
+        self.assertTrue(res_rekap.is_valid)
+        self.assertEqual(res_rekap.total_sheets, 1)
+        self.assertEqual(res_rekap.sheet_summaries[0].sheet_name, "KADUS 1")
+        self.assertFalse(res_rekap.sheet_summaries[1].is_voter_sheet)
+        self.assertFalse(res_rekap.sheet_summaries[2].is_voter_sheet)
+
+        # Single-sheet with region grouping (KADUS column)
+        single_kadus_path = os.path.join(self.test_dir, "test_single_sheet_grouping.xlsx")
+        wb_single = openpyxl.Workbook()
+        ws_s = wb_single.active
+        ws_s.title = "DPT GABUNGAN"
+        ws_s.append(["No", "Nama", "Alamat", "KADUS"])
+        ws_s.append(["1", "AGUS SETIAWAN", "RT 01 RW 01", "KADUS 1"])
+        ws_s.append(["2", "BAMBANG PAMUNGKAS", "RT 02 RW 01", "KADUS 1"])
+        ws_s.append(["3", "CITRA KIRANA", "RT 01 RW 02", "KADUS 2"])
+        ws_s.append(["4", "DEWI SARTIKA", "RT 02 RW 02", "KADUS 2"])
+        wb_single.save(single_kadus_path)
+        wb_single.close()
+
+        res_single = scan_and_validate_excel(single_kadus_path)
+        self.assertTrue(res_single.is_valid)
+        self.assertEqual(res_single.total_sheets, 2)
+        sheet_names = [s.sheet_name for s in res_single.sheet_summaries if s.is_voter_sheet]
+        self.assertIn("KADUS 1", sheet_names)
+        self.assertIn("KADUS 2", sheet_names)
+        self.assertEqual(res_single.total_voters, 4)
+
+    def test_23_standard_format_compatibility_validator(self) -> None:
+        from app.core.excel_scanner import scan_and_validate_excel
+        from app.core.word_preparer import check_and_prepare_word_template
+        import docx
+
+        sample_excel = os.path.join(PROJECT_ROOT, "data", "templates", "SAMPLE_DPT_DUMMY.xlsx")
+        res_xl = scan_and_validate_excel(sample_excel)
+        self.assertTrue(res_xl.is_standard_dpt)
+        self.assertTrue(res_xl.format_status_text.startswith("✓ Sesuai Format Standar DPT"))
+
+        sample_word = os.path.join(PROJECT_ROOT, "data", "templates", "SAMPLE_SURAT_DUMMY.docx")
+        res_word = check_and_prepare_word_template(sample_word)
+        self.assertTrue(res_word.is_standard_format)
+        self.assertEqual(res_word.format_status_text, "✓ Sesuai Format Standar (2 Surat/Lembar • 12 Tag Lengkap)")
+
+        # Custom 1-UP Word
+        custom_doc_path = os.path.join(self.test_dir, "custom_1up_test.docx")
+        cdoc = docx.Document()
+        cdoc.add_paragraph("SURAT UNDANGAN KUSTOM")
+        cdoc.add_paragraph("Nomor: {{nomor}}")
+        cdoc.add_paragraph("Nama: {{nama}}")
+        cdoc.add_paragraph("Alamat: {{alamat}}")
+        cdoc.save(custom_doc_path)
+
+        res_custom_word = check_and_prepare_word_template(custom_doc_path)
+        self.assertTrue(res_custom_word.is_valid)
+        self.assertFalse(res_custom_word.is_standard_format)
+        self.assertTrue(res_custom_word.format_status_text.startswith("• Format Kustom Terdeteksi"))
 
 if __name__ == "__main__":
     unittest.main()

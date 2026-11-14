@@ -847,8 +847,8 @@ class MainWindow(ctk.CTk):
 
         if res.is_valid:
             self.word_ready = True
-            mode_desc = "2 Surat/Lembar" if res.layout_mode == "2-UP" else "1 Surat/Lembar"
-            self.doc_row_word.set_status(f"Siap Mailing • Mode {mode_desc}", "ready")
+            status_txt = res.format_status_text if res.format_status_text else f"• Mode {mode_desc} Siap Mailing"
+            self.doc_row_word.set_status(status_txt, "ready")
             self._log(f"[WORD SIAP] {res.status_badge}: {res.prepared_docx_path}")
         else:
             self.word_ready = False
@@ -961,9 +961,14 @@ class MainWindow(ctk.CTk):
 
         self.excel_ready = True
         if res.is_valid:
-            self.doc_row_excel.set_status(f"Siap Mailing • {res.total_sheets} Kadus ({res.total_voters:,} pemilih)", "ready")
+            status_txt = res.format_status_text if res.format_status_text else f"✓ Siap Mailing • {res.total_sheets} Kadus ({res.total_voters:,} pemilih)"
+            if res.is_standard_dpt:
+                status_bar_txt = f"✓ Sesuai Format Standar DPT ({res.total_sheets} Sheet Kadus Seragam • {res.total_voters:,} Pemilih). Zero Error."
+            else:
+                status_bar_txt = f"✓ Format Kustom Terpetakan ({res.total_sheets} Wilayah • {res.total_voters:,} Pemilih). Siap Mailing."
+            self.doc_row_excel.set_status(status_txt, "ready")
             self.excel_status_bar.configure(
-                text=f"✓ Ditemukan {res.total_sheets} Sheet DPT valid ({res.total_voters:,} pemilih). Zero Error.",
+                text=status_bar_txt,
                 text_color=self.theme.status_ready,
             )
         elif res.schema_type == "PERLU_PEMETAAN_MANUAL":

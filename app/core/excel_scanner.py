@@ -148,6 +148,10 @@ class PreFlightScanResult(BaseModel):
     schema_message: str = ""
     column_mapping: dict[str, int] = Field(default_factory=dict)
     available_columns: list[tuple[int, str]] = Field(default_factory=list)
+    is_uniform_multisheet: bool = True
+    cross_sheet_uniformity: str = ""
+    is_standard_dpt: bool = False
+    format_status_text: str = ""
 
 def transform_gender(val: Any) -> str:
     cleaned = str(val or "").strip().upper()
@@ -307,6 +311,39 @@ def _find_wilayah_text(df: pd.DataFrame, default_sheet_name: str) -> str:
                 if clean_text:
                     return clean_text
     return default_sheet_name
+
+def check_cross_sheet_uniformity(
+    voter_sheets: list[SheetScanSummary],
+) -> tuple[bool, str]:
+    if not voter_sheets:
+        return True, "Tidak ada sheet pemilih."
+    if len(voter_sheets) == 1:
+        s0 = voter_sheets[0]
+        row_num = s0.header_row_index + 1
+        if s0.schema_type == "STANDAR_DPT":
+            return True, f"1 Sheet Pemilih (Header Baris {row_num} • Format Standar DPT)"
+        return True, f"1 Sheet Pemilih (Header Baris {row_num} • Terpetakan)"
+
+    first_header_row = voter_sheets[0].header_row_index
+    first_col_map = voter_sheets[0].column_mapping
+    all_same_row = all(s.header_row_index == first_header_row for s in voter_sheets)
+    all_same_cols = all(s.column_mapping == first_col_map for s in voter_sheets)
+    all_standard = all(s.schema_type == "STANDAR_DPT" for s in voter_sheets)
+
+    is_uniform = all_same_row and (all_same_cols or all_standard)
+    n = len(voter_sheets)
+
+    if is_uniform:
+        if all_standard:
+            desc = f"{n} Sheet Seragam (Header Baris {first_header_row + 1} • Format Standar DPT)"
+        else:
+            desc = f"{n} Sheet Seragam (Header Baris {first_header_row + 1} • Kolom Konsisten)"
+    else:
+        shifted_rows = sorted(list(set(s.header_row_index + 1 for s in voter_sheets)))
+        rows_str = ", ".join(str(r) for r in shifted_rows)
+        desc = f"{n} Sheet Terbaca Adaptif (Posisi Header Bervariasi: Baris {rows_str})"
+
+    return is_uniform, desc
 
 def scan_and_validate_excel(
     file_path: str,
@@ -528,7 +565,99 @@ def scan_and_validate_excel(
                     )
 
     voter_sheets = [s for s in summaries if s.is_voter_sheet]
-    is_valid = len(voter_sheets) > 0 and len(all_issues) == 0
+
+    if len(voter_sheets) == 1:
+        s0 = voter_sheets[0]
+        region_col_idx: int | None = None
+        region_col_name = ""
+
+        for c_idx, c_label in s0.available_columns:
+            cleaned_label = c_label.strip().lower()
+            if re.search(r"\b(kadus|dusun|wilayah|rw|lingkungan|dukuh)\b", cleaned_label):
+                if not is_blocked_pii(cleaned_label):
+                    region_col_idx = c_idx
+                    region_col_name = c_label
+                    break
+
+        if region_col_idx is not None and s0.voters:
+            snake_key = to_snake_case(region_col_name)
+            raw_regions: list[str] = []
+            for v in s0.voters:
+                val = v.extra_fields.get(snake_key, "").strip()
+                if not val and s0.column_mapping.get("rw") == region_col_idx:
+                    m = re.search(r"RW\s*(\d+)", v.alamat)
+                    val = f"RW {m.group(1)}" if m else ""
+                if val:
+                    raw_regions.append(val)
+
+            unique_regions = list(dict.fromkeys(raw_regions))
+            if len(unique_regions) >= 2:
+                grouped_summaries: list[SheetScanSummary] = []
+                for reg_val in unique_regions:
+                    grp_voters: list[VoterData] = []
+                    for v in s0.voters:
+                        v_reg = v.extra_fields.get(snake_key, "").strip()
+                        if not v_reg and s0.column_mapping.get("rw") == region_col_idx:
+                            m = re.search(r"RW\s*(\d+)", v.alamat)
+                            v_reg = f"RW {m.group(1)}" if m else ""
+                        if v_reg == reg_val:
+                            v_copy = v.model_copy()
+                            v_copy.sheet_name = reg_val
+                            v_copy.wilayah = reg_val
+                            grp_voters.append(v_copy)
+
+                    v_cnt = len(grp_voters)
+                    p_cnt = math.ceil(v_cnt / 2) if v_cnt > 0 else 0
+                    grp_row_indices = {v.row_index for v in grp_voters}
+                    grp_issues = [iss for iss in s0.issues if iss.row_index in grp_row_indices]
+
+                    grp_summary = SheetScanSummary(
+                        sheet_name=reg_val,
+                        wilayah_text=reg_val,
+                        is_voter_sheet=v_cnt > 0,
+                        is_selected=v_cnt > 0,
+                        total_voters=v_cnt,
+                        expected_pages=p_cnt,
+                        issues=grp_issues,
+                        voters=grp_voters,
+                        header_row_index=s0.header_row_index,
+                        schema_type=s0.schema_type,
+                        schema_message=f"Dikelompokkan otomatis dari kolom {region_col_name}: {reg_val}",
+                        column_mapping=s0.column_mapping,
+                        available_columns=s0.available_columns,
+                    )
+                    grouped_summaries.append(grp_summary)
+
+                new_summaries: list[SheetScanSummary] = []
+                for s in summaries:
+                    if s.sheet_name == s0.sheet_name:
+                        new_summaries.extend(grouped_summaries)
+                    else:
+                        new_summaries.append(s)
+                summaries = new_summaries
+                voter_sheets = grouped_summaries
+
+    voter_sheets = [s for s in summaries if s.is_voter_sheet]
+    voter_sheet_names = {s.sheet_name for s in voter_sheets}
+    voter_issues = [iss for iss in all_issues if iss.sheet_name in voter_sheet_names]
+    is_valid = len(voter_sheets) > 0 and len(voter_issues) == 0
+
+    is_uniform, uniformity_desc = check_cross_sheet_uniformity(voter_sheets)
+
+    is_standard_dpt = (
+        len(voter_sheets) > 0
+        and all(s.schema_type == "STANDAR_DPT" for s in voter_sheets)
+        and is_uniform
+        and is_valid
+    )
+
+    if is_standard_dpt:
+        format_status_text = f"✓ Sesuai Format Standar DPT ({len(voter_sheets)} Sheet Kadus Seragam • {total_all_voters:,} Pemilih)"
+    elif is_valid:
+        h_row = (voter_sheets[0].header_row_index + 1) if voter_sheets else 1
+        format_status_text = f"• Format Kustom Terpetakan ({len(voter_sheets)} Wilayah • Header Baris {h_row})"
+    else:
+        format_status_text = "• Perlu Perbaikan Struktur Excel"
 
     return PreFlightScanResult(
         is_valid=is_valid,
@@ -542,4 +671,8 @@ def scan_and_validate_excel(
         schema_message=top_schema_msg,
         column_mapping=top_col_mapping,
         available_columns=top_available_cols,
+        is_uniform_multisheet=is_uniform,
+        cross_sheet_uniformity=uniformity_desc,
+        is_standard_dpt=is_standard_dpt,
+        format_status_text=format_status_text,
     )

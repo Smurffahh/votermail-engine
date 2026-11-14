@@ -191,7 +191,10 @@ class DocumentSourceRow(ctk.CTkFrame):
         else:
             color = THEME["text_muted"]
 
-        display_text = f"• {text}" if not text.startswith("•") else text
+        if text.startswith("•") or text.startswith("✓") or text.startswith("["):
+            display_text = text
+        else:
+            display_text = f"• {text}"
         self.status_label.configure(text=display_text, text_color=color)
 
     def update_theme(self, theme: ThemeTokens) -> None:

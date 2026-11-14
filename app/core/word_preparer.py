@@ -155,6 +155,8 @@ class WordCheckResult(BaseModel):
     status_badge: str = "Belum Dicek"
     message: str = ""
     issues: list[str] = Field(default_factory=list)
+    is_standard_format: bool = False
+    format_status_text: str = ""
 
 def _convert_doc_to_docx_via_word_com(source_path: str, target_docx_path: str) -> None:
     target_abs = to_win_abs_path(target_docx_path)
@@ -571,19 +573,39 @@ def check_and_prepare_word_template(
         issues = [f"Tag belum terinjeksi: {', '.join(missing_tags)}"]
         result.issues = issues
         result.message = " | ".join(issues)
+        result.is_standard_format = False
+        result.format_status_text = f"• Perlu Perbaikan: {result.message}"
     else:
         result.is_valid = True
-        if template_type == "STANDAR":
+        has_all_slot1_fields = {"Nomor", "Nama Pemilih", "Laki-laki/Perempuan", "Umur", "Alamat"}.issubset(set(result.detected_fields_slot1))
+        has_all_slot2_fields = {"Nomor", "Nama Pemilih", "Laki-laki/Perempuan", "Umur", "Alamat"}.issubset(set(result.detected_fields_slot2))
+        has_receipt_tags = full_text.count("{{nomor_1}}") >= 2 and full_text.count("{{nomor_2}}") >= 2
+        has_gov_anchors = "panitia pemilihan" in initial_lower and ("karangjengkol" in initial_lower or "penerima/pemilih" in initial_lower or "ratno" in initial_lower)
+
+        is_std = (
+            layout_mode == "2-UP"
+            and has_all_slot1_fields
+            and has_all_slot2_fields
+            and has_receipt_tags
+            and has_gov_anchors
+        )
+        result.is_standard_format = is_std
+
+        if is_std:
             result.status_badge = "Siap Mailing (Mode 2 Surat/Lembar • Standar)"
             result.message = "File Word Siap untuk Mailing (12 Tag Terverifikasi Lengkap: Mode 2 Surat/Lembar Standar)"
+            result.format_status_text = "✓ Sesuai Format Standar (2 Surat/Lembar • 12 Tag Lengkap)"
         elif layout_mode == "2-UP" and template_type != "MANUAL_TAGS":
             result.status_badge = "Siap Mailing (Mode 2 Surat/Lembar • Kustom)"
             result.message = f"File Word Siap untuk Mailing (Mode 2 Surat/Lembar • {len(result.detected_fields_slot1)} field slot 1, {len(result.detected_fields_slot2)} field slot 2)"
+            result.format_status_text = "• Format Kustom Terdeteksi (Mode 2-Up • Siap Mailing)"
         elif layout_mode == "1-UP" and template_type != "MANUAL_TAGS":
             result.status_badge = "Siap Mailing (Mode 1 Surat/Lembar • Kustom)"
             result.message = f"File Word Siap untuk Mailing (Mode 1 Surat/Lembar • {len(result.detected_fields_slot1)} field terverifikasi)"
+            result.format_status_text = "• Format Kustom Terdeteksi (Mode 1-Up • Siap Mailing)"
         else:
             result.status_badge = "Siap Mailing (Tag Manual {{...}} Terdeteksi)"
             result.message = f"File Word Siap untuk Mailing (Tag Manual {{...}} • Mode {layout_mode})"
+            result.format_status_text = f"• Format Kustom Terdeteksi (Mode {layout_mode} • Siap Mailing)"
 
     return result
