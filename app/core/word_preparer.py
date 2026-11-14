@@ -148,6 +148,8 @@ class WordCheckResult(BaseModel):
     prepared_docx_path: str = ""
     is_converted: bool = False
     has_two_slots: bool = True
+    layout_mode: str = "2-UP"
+    template_type: str = "STANDAR"
     detected_fields_slot1: list[str] = Field(default_factory=list)
     detected_fields_slot2: list[str] = Field(default_factory=list)
     status_badge: str = "Belum Dicek"
@@ -354,16 +356,56 @@ def check_and_prepare_word_template(
         return result
 
     patterns = [
-        (r"^\s*Nomor[\s\t]*:.*$", "nomor", "Nomor"),
-        (r"^\s*Nama\s+Pemilih[\s\t]*:.*$", "nama", "Nama Pemilih"),
-        (r"^\s*Laki[\s\-]*laki\s*/\s*Perempuan[\s\t]*:.*$", "jk", "Laki-laki/Perempuan"),
-        (r"^\s*Umur[\s\t]*:.*$", "umur", "Umur"),
-        (r"^\s*Alamat[\s\t]*:.*$", "alamat", "Alamat"),
-        (r"^\s*DAFTAR\s+PEMILIH\s+TETAP\s+NOMOR[\s\t]*:.*$", "nomor_dpt", ""),
+        (r"^\s*(?:nomor|no\.?|no\s+urut)[\s\t]*:.*$", "nomor", "Nomor"),
+        (r"^\s*(?:nama\s+pemilih|nama\s+lengkap|nama\s+warga|nama)[\s\t]*:.*$", "nama", "Nama Pemilih"),
+        (r"^\s*(?:laki[\s\-]*laki\s*/\s*perempuan|jenis\s+kelamin|l\s*/\s*p|gender|kelamin)[\s\t]*:.*$", "jk", "Laki-laki/Perempuan"),
+        (r"^\s*(?:usia\s*\(tahun\)|umur|usia)[\s\t]*:.*$", "umur", "Umur"),
+        (r"^\s*(?:alamat|tempat\s+tinggal|domisili)[\s\t]*:.*$", "alamat", "Alamat"),
+        (r"^\s*(?:daftar\s+pemilih\s+tetap\s+nomor|tanda\s+terima\s+nomor|tanda\s+terima)[\s\t]*:.*$", "nomor_dpt", ""),
     ]
 
     tag_counts: dict[str, int] = {}
     schedule_counts: dict[str, int] = {}
+
+    initial_text = " ".join(p.text for p in iter_all_paragraphs(doc))
+    initial_lower = initial_text.lower()
+
+    has_slot1_tags = "{{nama_1}}" in initial_text or "{{nomor_1}}" in initial_text
+    has_slot2_tags = "{{nama_2}}" in initial_text or "{{nomor_2}}" in initial_text
+    has_single_tags = ("{{nama}}" in initial_text or "{{nomor}}" in initial_text) and not has_slot2_tags
+
+    is_manual_tagged = has_slot1_tags or has_single_tags
+
+    if has_slot2_tags:
+        layout_mode = "2-UP"
+        has_two_slots = True
+        template_type = "STANDAR" if ("ratno" in initial_lower or "karangjengkol" in initial_lower) else "MANUAL_TAGS"
+    elif has_single_tags:
+        layout_mode = "1-UP"
+        has_two_slots = False
+        template_type = "MANUAL_TAGS"
+    else:
+        nama_matches = 0
+        alamat_matches = 0
+        for p in iter_all_paragraphs(doc):
+            ptxt = p.text.strip()
+            if re.match(patterns[1][0], ptxt, flags=re.IGNORECASE):
+                nama_matches += 1
+            if re.match(patterns[4][0], ptxt, flags=re.IGNORECASE):
+                alamat_matches += 1
+
+        if nama_matches >= 2 or alamat_matches >= 2:
+            layout_mode = "2-UP"
+            has_two_slots = True
+            template_type = "STANDAR" if ("ratno" in initial_lower or "karangjengkol" in initial_lower) else "KUSTOM_2UP"
+        else:
+            layout_mode = "1-UP"
+            has_two_slots = False
+            template_type = "KUSTOM_1UP"
+
+    result.layout_mode = layout_mode
+    result.template_type = template_type
+    result.has_two_slots = has_two_slots
 
     # Pre-scan Slot 1 to dynamically extract schedule values and column 2 text
     extracted_schedule: dict[str, str] = {
@@ -404,96 +446,121 @@ def check_and_prepare_word_template(
             if len(parts) > 2 and parts[2].strip():
                 extracted_schedule["col2_waktu"] = parts[2].strip()
 
-    for p in iter_all_paragraphs(doc):
-        txt = p.text
-        lower = txt.lower()
+    if not is_manual_tagged:
+        for p in iter_all_paragraphs(doc):
+            txt = p.text
+            lower = txt.lower()
 
-        if "catatan" in lower and "diwakilkan" in lower:
-            clean_catatan = re.sub(r"\.\.+", ".", txt)
-            set_paragraph_text_preserving_drawings(p, clean_catatan)
-            continue
+            if "catatan" in lower and "diwakilkan" in lower:
+                clean_catatan = re.sub(r"\.\.+", ".", txt)
+                set_paragraph_text_preserving_drawings(p, clean_catatan)
+                continue
 
-        if "untuk memberikan suara pada" in lower:
-            set_paragraph_text_preserving_drawings(p, "Untuk memberikan suara pada\t\t:")
-            continue
+            if "untuk memberikan suara pada" in lower:
+                set_paragraph_text_preserving_drawings(p, "Untuk memberikan suara pada\t\t:")
+                continue
 
-        matched_field = False
-        for pat, key, field_name in patterns:
-            if re.match(pat, txt, flags=re.IGNORECASE):
-                slot = tag_counts.get(key, 0) + 1
-                tag_counts[key] = slot
+            matched_field = False
+            for pat, key, field_name in patterns:
+                if re.match(pat, txt, flags=re.IGNORECASE):
+                    slot = tag_counts.get(key, 0) + 1
+                    tag_counts[key] = slot
 
-                if key == "nomor":
-                    set_paragraph_text_preserving_drawings(p, f"Nomor\t: {{{{nomor_{slot}}}}}")
-                elif key == "nama":
-                    set_paragraph_text_preserving_drawings(p, f"Nama Pemilih\t: {{{{nama_{slot}}}}}")
-                elif key == "jk":
-                    set_paragraph_text_preserving_drawings(p, f"Laki-laki/Perempuan\t: {{{{jk_{slot}}}}}")
-                elif key == "umur":
-                    set_paragraph_text_preserving_drawings(p, f"Umur\t: {{{{umur_{slot}}}}}")
-                elif key == "alamat":
-                    set_paragraph_text_preserving_drawings(p, f"Alamat\t: {{{{alamat_{slot}}}}}")
-                elif key == "nomor_dpt":
-                    set_paragraph_text_preserving_drawings(p, f"DAFTAR PEMILIH TETAP NOMOR : {{{{nomor_{slot}}}}}")
+                    if layout_mode == "1-UP":
+                        slot_str = "1"
+                    else:
+                        slot_str = str(slot)
 
-                if field_name:
-                    if slot == 1:
-                        result.detected_fields_slot1.append(field_name)
-                    elif slot == 2:
-                        result.detected_fields_slot2.append(field_name)
+                    if key == "nomor":
+                        set_paragraph_text_preserving_drawings(p, f"Nomor\t: {{{{nomor_{slot_str}}}}}")
+                    elif key == "nama":
+                        set_paragraph_text_preserving_drawings(p, f"Nama Pemilih\t: {{{{nama_{slot_str}}}}}")
+                    elif key == "jk":
+                        set_paragraph_text_preserving_drawings(p, f"Laki-laki/Perempuan\t: {{{{jk_{slot_str}}}}}")
+                    elif key == "umur":
+                        set_paragraph_text_preserving_drawings(p, f"Umur\t: {{{{umur_{slot_str}}}}}")
+                    elif key == "alamat":
+                        set_paragraph_text_preserving_drawings(p, f"Alamat\t: {{{{alamat_{slot_str}}}}}")
+                    elif key == "nomor_dpt":
+                        set_paragraph_text_preserving_drawings(p, f"DAFTAR PEMILIH TETAP NOMOR : {{{{nomor_{slot_str}}}}}")
 
-                matched_field = True
-                break
+                    if field_name:
+                        if slot == 1 or layout_mode == "1-UP":
+                            result.detected_fields_slot1.append(field_name)
+                        elif slot == 2:
+                            result.detected_fields_slot2.append(field_name)
 
-        if matched_field:
-            continue
+                    matched_field = True
+                    break
 
-        if "hari, tanggal" in lower:
-            c = schedule_counts.get("hari", 0) + 1
-            schedule_counts["hari"] = c
-            if c == 2:
-                slot2_val = _extract_val_from_line(txt, "Hari, tanggal")
-                if not slot2_val:
-                    set_paragraph_text_preserving_drawings(
-                        p,
-                        f"Hari, tanggal\t: {extracted_schedule['hari']}\t{extracted_schedule['col2_hari']}"
-                    )
-        elif "tempat" in lower and ":" in txt:
-            c = schedule_counts.get("tempat", 0) + 1
-            schedule_counts["tempat"] = c
-            if c == 2:
-                slot2_val = _extract_val_from_line(txt, "Tempat")
-                if not slot2_val:
-                    set_paragraph_text_preserving_drawings(
-                        p,
-                        f"Tempat\t: {extracted_schedule['tempat']}\t{extracted_schedule['col2_tempat']}"
-                    )
-        elif "waktu" in lower and ":" in txt:
-            c = schedule_counts.get("waktu", 0) + 1
-            schedule_counts["waktu"] = c
-            if c == 2:
-                slot2_val = _extract_val_from_line(txt, "Waktu")
-                if not slot2_val:
-                    set_paragraph_text_preserving_drawings(
-                        p,
-                        f"Waktu\t: {extracted_schedule['waktu']}\t{extracted_schedule['col2_waktu']}"
-                    )
+            if matched_field:
+                continue
+
+            if layout_mode == "2-UP":
+                if "hari, tanggal" in lower:
+                    c = schedule_counts.get("hari", 0) + 1
+                    schedule_counts["hari"] = c
+                    if c == 2:
+                        slot2_val = _extract_val_from_line(txt, "Hari, tanggal")
+                        if not slot2_val:
+                            set_paragraph_text_preserving_drawings(
+                                p,
+                                f"Hari, tanggal\t: {extracted_schedule['hari']}\t{extracted_schedule['col2_hari']}"
+                            )
+                elif "tempat" in lower and ":" in txt:
+                    c = schedule_counts.get("tempat", 0) + 1
+                    schedule_counts["tempat"] = c
+                    if c == 2:
+                        slot2_val = _extract_val_from_line(txt, "Tempat")
+                        if not slot2_val:
+                            set_paragraph_text_preserving_drawings(
+                                p,
+                                f"Tempat\t: {extracted_schedule['tempat']}\t{extracted_schedule['col2_tempat']}"
+                            )
+                elif "waktu" in lower and ":" in txt:
+                    c = schedule_counts.get("waktu", 0) + 1
+                    schedule_counts["waktu"] = c
+                    if c == 2:
+                        slot2_val = _extract_val_from_line(txt, "Waktu")
+                        if not slot2_val:
+                            set_paragraph_text_preserving_drawings(
+                                p,
+                                f"Waktu\t: {extracted_schedule['waktu']}\t{extracted_schedule['col2_waktu']}"
+                            )
+    else:
+        for key, label in [("nomor", "Nomor"), ("nama", "Nama Pemilih"), ("jk", "Laki-laki/Perempuan"), ("umur", "Umur"), ("alamat", "Alamat")]:
+            tag1 = "{{" + f"{key}_1" + "}}"
+            tag2 = "{{" + f"{key}_2" + "}}"
+            tag_plain = "{{" + key + "}}"
+            if tag1 in initial_text or tag_plain in initial_text:
+                result.detected_fields_slot1.append(label)
+            if tag2 in initial_text:
+                result.detected_fields_slot2.append(label)
 
     doc.save(result.prepared_docx_path)
 
     recheck_doc = docx.Document(result.prepared_docx_path)
     full_text = " ".join(p.text for p in iter_all_paragraphs(recheck_doc))
 
-    required_tags = [
-        "{{nomor_1}}", "{{nama_1}}", "{{jk_1}}", "{{umur_1}}", "{{alamat_1}}",
-        "{{nomor_2}}", "{{nama_2}}", "{{jk_2}}", "{{umur_2}}", "{{alamat_2}}"
-    ]
-    missing_tags = [t for t in required_tags if t not in full_text]
-
-    if full_text.count("{{nomor_1}}") < 2:
-        missing_tags.append("{{nomor_1}} pada Tanda Terima Atas")
-    if full_text.count("{{nomor_2}}") < 2:
-        missing_tags.append("{{nomor_2}} pada Tanda Terima Bawah")
+    missing_tags = []
+    if layout_mode == "2-UP":
+        required_tags = [
+            "{{nomor_1}}", "{{nama_1}}", "{{jk_1}}", "{{umur_1}}", "{{alamat_1}}",
+            "{{nomor_2}}", "{{nama_2}}", "{{jk_2}}", "{{umur_2}}", "{{alamat_2}}"
+        ]
+        missing_tags = [t for t in required_tags if t not in full_text]
+        if template_type == "STANDAR":
+            if full_text.count("{{nomor_1}}") < 2:
+                missing_tags.append("{{nomor_1}} pada Tanda Terima Atas")
+            if full_text.count("{{nomor_2}}") < 2:
+                missing_tags.append("{{nomor_2}} pada Tanda Terima Bawah")
+    else:
+        if "{{nama_1}}" not in full_text and "{{nama}}" not in full_text:
+            missing_tags.append("{{nama_1}} / {{nama}}")
+        if "{{nomor_1}}" not in full_text and "{{nomor}}" not in full_text:
+            missing_tags.append("{{nomor_1}} / {{nomor}}")
+        if "{{alamat_1}}" not in full_text and "{{alamat}}" not in full_text:
+            missing_tags.append("{{alamat_1}} / {{alamat}}")
 
     result.detected_fields_slot1 = sorted(list(set(result.detected_fields_slot1)))
     result.detected_fields_slot2 = sorted(list(set(result.detected_fields_slot2)))
@@ -506,10 +573,17 @@ def check_and_prepare_word_template(
         result.message = " | ".join(issues)
     else:
         result.is_valid = True
-        result.status_badge = "Siap Mailing"
-        result.message = (
-            "File Word Siap untuk Mailing (12 Tag Terverifikasi Lengkap: "
-            "Nomor, Nama, L/P, Umur, Alamat, Jadwal Surat Bawah & Tanda Terima)"
-        )
+        if template_type == "STANDAR":
+            result.status_badge = "Siap Mailing (Mode 2 Surat/Lembar • Standar)"
+            result.message = "File Word Siap untuk Mailing (12 Tag Terverifikasi Lengkap: Mode 2 Surat/Lembar Standar)"
+        elif layout_mode == "2-UP" and template_type != "MANUAL_TAGS":
+            result.status_badge = "Siap Mailing (Mode 2 Surat/Lembar • Kustom)"
+            result.message = f"File Word Siap untuk Mailing (Mode 2 Surat/Lembar • {len(result.detected_fields_slot1)} field slot 1, {len(result.detected_fields_slot2)} field slot 2)"
+        elif layout_mode == "1-UP" and template_type != "MANUAL_TAGS":
+            result.status_badge = "Siap Mailing (Mode 1 Surat/Lembar • Kustom)"
+            result.message = f"File Word Siap untuk Mailing (Mode 1 Surat/Lembar • {len(result.detected_fields_slot1)} field terverifikasi)"
+        else:
+            result.status_badge = "Siap Mailing (Tag Manual {{...}} Terdeteksi)"
+            result.message = f"File Word Siap untuk Mailing (Tag Manual {{...}} • Mode {layout_mode})"
 
     return result

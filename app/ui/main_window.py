@@ -67,6 +67,7 @@ from app.ui.components import (
     VoterPreviewTable,
     StatusBadge,
     AboutModal,
+    ColumnMapperModal,
 )
 
 class MainWindow(ctk.CTk):
@@ -107,6 +108,7 @@ class MainWindow(ctk.CTk):
         self.excel_snapshot: ExcelSnapshot | None = None
         self.word_file_dirty: bool = False
         self.excel_file_dirty: bool = False
+        self.custom_column_map: dict[str, int] | None = None
 
         self._build_ui()
         self._poll_worker_queue()
@@ -328,6 +330,7 @@ class MainWindow(ctk.CTk):
             theme=self.theme,
             on_browse=self._browse_excel_file,
             on_recheck=self._run_excel_scan,
+            on_map_columns=self._open_column_mapper,
             recheck_label="Scan Ulang",
         )
         self.doc_row_excel.pack(fill="x", padx=12, pady=(0, 12))
@@ -844,14 +847,39 @@ class MainWindow(ctk.CTk):
 
         if res.is_valid:
             self.word_ready = True
-            self.doc_row_word.set_status(f"Siap Mailing • {len(res.detected_fields_slot1)} field terverifikasi", "ready")
-            self._log(f"[WORD SIAP] 12 tag mail-merge terinjeksi rapi: {res.prepared_docx_path}")
+            mode_desc = "2 Surat/Lembar" if res.layout_mode == "2-UP" else "1 Surat/Lembar"
+            self.doc_row_word.set_status(f"Siap Mailing • Mode {mode_desc}", "ready")
+            self._log(f"[WORD SIAP] {res.status_badge}: {res.prepared_docx_path}")
         else:
             self.word_ready = False
             self.doc_row_word.set_status(f"Perlu Perbaikan: {res.message}", "error")
             self._log(f"[WORD ERROR] {res.message}")
 
+        self._update_selected_metrics()
         self._check_ready_state()
+
+    def _open_column_mapper(self) -> None:
+        if not self.excel_scan_result or not self.excel_scan_result.available_columns:
+            messagebox.showinfo(
+                "Informasi",
+                "Pilih berkas Excel DPT terlebih dahulu agar aplikasi dapat membaca daftar kolom yang tersedia.",
+            )
+            return
+
+        def on_applied(new_mapping: dict[str, int]) -> None:
+            self.custom_column_map = new_mapping
+            self._log(f"[KOLOM DPT] Pemetaan kolom manual diterapkan: {new_mapping}")
+            self._run_excel_scan()
+
+        hdr_idx = self.excel_scan_result.sheet_summaries[0].header_row_index if self.excel_scan_result.sheet_summaries else 0
+        ColumnMapperModal(
+            parent=self,
+            theme=self.theme,
+            available_columns=self.excel_scan_result.available_columns,
+            current_mapping=self.custom_column_map or self.excel_scan_result.column_mapping,
+            on_apply=on_applied,
+            header_row_index=hdr_idx,
+        )
 
     def _run_excel_scan(self) -> None:
         if self.is_processing:
@@ -863,12 +891,13 @@ class MainWindow(ctk.CTk):
             return
 
         addr_mode = "lengkap" if "Lengkap" in self.address_mode_menu.get() else "hanya_alamat"
+        custom_map = self.custom_column_map
         self.doc_row_excel.set_status("Memindai struktur DPT...", "process")
         self._log(f"[EXCEL] Memindai struktur DPT: {os.path.basename(path)}")
 
         def worker() -> None:
             try:
-                res = scan_and_validate_excel(path, address_mode=addr_mode)
+                res = scan_and_validate_excel(path, address_mode=addr_mode, custom_column_map=custom_map)
                 self.worker_queue.put(("excel_done", res))
             except Exception as exc:
                 self.worker_queue.put(("excel_error", str(exc)))
@@ -890,6 +919,9 @@ class MainWindow(ctk.CTk):
         self.excel_fingerprint = (new_snap.sha256, new_snap.mtime, new_snap.size)
         self.excel_file_dirty = False
 
+        if res.schema_message:
+            self._log(f"[EXCEL FORMAT] {res.schema_message}")
+
         for child in self.sheets_scroll_frame.winfo_children():
             child.destroy()
         self.kadus_rows.clear()
@@ -898,17 +930,20 @@ class MainWindow(ctk.CTk):
 
         if not voter_sheets:
             self.excel_ready = False
-            self.doc_row_excel.set_status("Tidak ditemukan Sheet DPT yang valid (Header Baris 10).", "error")
+            self.doc_row_excel.set_status("Tidak ditemukan Sheet DPT yang valid.", "error")
             self.excel_status_bar.configure(text="Tidak ditemukan Sheet DPT yang valid.", text_color=self.theme.status_error)
             self._check_ready_state()
             return
 
+        layout_1up = bool(self.word_check_result and self.word_check_result.layout_mode == "1-UP")
+
         for s in voter_sheets:
+            page_count = s.total_voters if layout_1up else s.expected_pages
             row = KadusRowItem(
                 self.sheets_scroll_frame,
                 sheet_name=s.sheet_name,
                 voter_count=s.total_voters,
-                page_count=s.expected_pages,
+                page_count=page_count,
                 is_selected=True,
                 theme=self.theme,
                 on_toggle=self._update_selected_metrics,
@@ -930,6 +965,12 @@ class MainWindow(ctk.CTk):
             self.excel_status_bar.configure(
                 text=f"✓ Ditemukan {res.total_sheets} Sheet DPT valid ({res.total_voters:,} pemilih). Zero Error.",
                 text_color=self.theme.status_ready,
+            )
+        elif res.schema_type == "PERLU_PEMETAAN_MANUAL":
+            self.doc_row_excel.set_status("Perlu Pemetaan Kolom • Klik 'Atur Kolom'", "warning")
+            self.excel_status_bar.configure(
+                text="Perhatian: Kolom Nama Pemilih belum terdeteksi. Silakan klik 'Atur Kolom'.",
+                text_color=self.theme.status_warning,
             )
         else:
             self.doc_row_excel.set_status(f"Perlu Perhatian • Ditemukan {len(res.all_issues)} anomali", "warning")
@@ -995,9 +1036,10 @@ class MainWindow(ctk.CTk):
             if s.sheet_name in self.kadus_rows and self.kadus_rows[s.sheet_name].checkbox_var.get()
         ]
 
+        layout = self.word_check_result.layout_mode if self.word_check_result else "2-UP"
         kadus_count = len(selected_sheets)
         total_voters = sum(s.total_voters for s in selected_sheets)
-        total_pages = sum(s.expected_pages for s in selected_sheets)
+        total_pages = total_voters if layout == "1-UP" else sum(s.expected_pages for s in selected_sheets)
 
         self.metric_bar.update_metrics(kadus_count, total_voters, total_pages)
 
@@ -1061,8 +1103,9 @@ class MainWindow(ctk.CTk):
             self._log("[PREVIEW] Excel belum di-scan, menggunakan data contoh lengkap (2 pemilih)...")
 
         template_doc = to_win_abs_path(self.word_check_result.prepared_docx_path)
-        self._log("[PREVIEW] Membuat pratinjau 1 halaman F4 menggunakan MS Word COM...")
-        ok, msg, final_pdf = generate_preview_via_word(template_doc, sample_voters, preview_pdf)
+        layout = self.word_check_result.layout_mode if self.word_check_result else "2-UP"
+        self._log(f"[PREVIEW] Membuat pratinjau 1 halaman ({layout}) menggunakan MS Word COM...")
+        ok, msg, final_pdf = generate_preview_via_word(template_doc, sample_voters, preview_pdf, layout_mode=layout)
 
         if ok:
             self._log(f"[PREVIEW SELESAI] Pratinjau tersimpan di: {final_pdf}")
@@ -1115,8 +1158,9 @@ class MainWindow(ctk.CTk):
         total_voters_all = sum(s.total_voters for s in selected_sheets)
         template_doc = self.word_check_result.prepared_docx_path
         verify_pdf_on = self.verify_switch.get() == 1
+        layout_mode = self.word_check_result.layout_mode if self.word_check_result else "2-UP"
 
-        self._log(f"[MAILING MULAI] Memulai proses mailing {len(selected_sheets)} Kadus ({total_voters_all:,} pemilih)...")
+        self._log(f"[MAILING MULAI] Memulai proses mailing {len(selected_sheets)} Kadus ({total_voters_all:,} pemilih, Mode: {layout_mode})...")
 
         def worker() -> None:
             processed_voters_acc = 0
@@ -1143,6 +1187,7 @@ class MainWindow(ctk.CTk):
                     output_pdf_path=out_pdf,
                     progress_callback=prog_cb,
                     cancel_event=self.cancel_event,
+                    layout_mode=layout_mode,
                 )
 
                 if not ok:
@@ -1153,7 +1198,7 @@ class MainWindow(ctk.CTk):
 
                 if verify_pdf_on and not self.cancel_event.is_set():
                     self.worker_queue.put(("verify_started", s.sheet_name))
-                    ver = verify_kadus_pdf(out_pdf, s.sheet_name, s.voters)
+                    ver = verify_kadus_pdf(out_pdf, s.sheet_name, s.voters, layout_mode=layout_mode)
                     audit_results.append(ver)
                     self.worker_queue.put(("verify_done", (ver, out_pdf)))
                 else:

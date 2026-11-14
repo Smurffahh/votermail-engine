@@ -236,7 +236,8 @@ class TestMailMergeApp(unittest.TestCase):
 
         res = check_and_prepare_word_template(self.real_doc_file, work_dir=self.test_dir)
         self.assertTrue(res.is_valid)
-        self.assertEqual(res.status_badge, "Siap Mailing")
+        self.assertTrue("Siap Mailing" in res.status_badge)
+        self.assertEqual(res.layout_mode, "2-UP")
         self.assertTrue(os.path.exists(res.prepared_docx_path))
 
         expected_fields = ["Alamat", "Laki-laki/Perempuan", "Nama Pemilih", "Nomor", "Umur"]
@@ -250,7 +251,8 @@ class TestMailMergeApp(unittest.TestCase):
         dummy_work = os.path.join(self.test_dir, "dummy_work")
         res = check_and_prepare_word_template(str(sample_docx), work_dir=dummy_work)
         self.assertTrue(res.is_valid)
-        self.assertEqual(res.status_badge, "Siap Mailing")
+        self.assertTrue("Siap Mailing" in res.status_badge)
+        self.assertEqual(res.layout_mode, "2-UP")
         self.assertTrue(os.path.exists(res.prepared_docx_path))
 
         expected_fields = ["Alamat", "Laki-laki/Perempuan", "Nama Pemilih", "Nomor", "Umur"]
@@ -479,8 +481,8 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(__author__, "Danang Satria")
         self.assertEqual(__github_user__, "Smurffahh")
         self.assertTrue(__repository__.startswith("https://github.com/Smurffahh"))
-        self.assertEqual(__version__, "1.7.1")
-        self.assertEqual(get_current_version(), "1.7.1")
+        self.assertEqual(__version__, "1.8.0")
+        self.assertEqual(get_current_version(), "1.8.0")
         self.assertGreaterEqual(len(FEATURE_REGISTRY), 9)
         self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.7.1")
 
@@ -562,6 +564,134 @@ class TestMailMergeApp(unittest.TestCase):
 
             is_accessible2, _ = check_file_accessible_for_writing(locked_file)
             self.assertTrue(is_accessible2)
+
+    def test_18_custom_excel_scanner_synonyms_and_pii_blocking(self) -> None:
+        import pandas as pd
+        custom_excel = os.path.join(self.test_dir, "custom_dpt.xlsx")
+        df = pd.DataFrame([
+            ["No", "Nama Lengkap", "Gender", "Usia", "Domisili", "TPS", "Nomor Induk Kependudukan (NIK)"],
+            ["1", "SITI AMINAH", "P", "28", "Dusun Krajan RT 01 RW 02", "TPS 03", "3303079999990001"],
+            ["2", "AGUS SANTOSO", "L", "35", "Dusun Krajan RT 02 RW 02", "TPS 03", "3303079999990002"],
+        ])
+        with pd.ExcelWriter(custom_excel) as writer:
+            df.to_excel(writer, sheet_name="DUSUN 1", header=False, index=False)
+
+        res = scan_and_validate_excel(custom_excel)
+        self.assertTrue(res.is_valid)
+        self.assertEqual(res.schema_type, "KUSTOM_TERPETAKAN")
+        self.assertEqual(res.total_voters, 2)
+        summary = res.sheet_summaries[0]
+        self.assertEqual(summary.voters[0].nama, "SITI AMINAH")
+        self.assertEqual(summary.voters[0].jenis_kelamin, "Perempuan")
+        self.assertEqual(summary.voters[0].umur, "28 Tahun")
+        self.assertEqual(summary.voters[0].extra_fields.get("tps"), "TPS 03")
+        self.assertNotIn("nik", summary.voters[0].extra_fields)
+        self.assertNotIn("nomor_induk_kependudukan_nik", summary.voters[0].extra_fields)
+
+    def test_19_word_checker_1up_and_manual_tags(self) -> None:
+        import docx
+        custom_1up_path = os.path.join(self.test_dir, "template_1up.docx")
+        doc = docx.Document()
+        doc.add_paragraph("SURAT UNDANGAN PEMILIHAN (1 PEMILIH / LEMBAR)")
+        doc.add_paragraph("Nomor : ")
+        doc.add_paragraph("Nama Pemilih : ")
+        doc.add_paragraph("Jenis Kelamin : ")
+        doc.add_paragraph("Usia : ")
+        doc.add_paragraph("Alamat : ")
+        doc.save(custom_1up_path)
+
+        res_1up = check_and_prepare_word_template(custom_1up_path, work_dir=self.test_dir)
+        self.assertTrue(res_1up.is_valid)
+        self.assertEqual(res_1up.layout_mode, "1-UP")
+        self.assertEqual(res_1up.template_type, "KUSTOM_1UP")
+        self.assertTrue("Siap Mailing" in res_1up.status_badge)
+
+        manual_path = os.path.join(self.test_dir, "template_manual.docx")
+        doc_manual = docx.Document()
+        doc_manual.add_paragraph("SURAT RESMI DENGAN TAG MANUAL")
+        doc_manual.add_paragraph("Kepada Yth. {{nama}} (No: {{nomor}})")
+        doc_manual.add_paragraph("Alamat: {{alamat}}")
+        doc_manual.save(manual_path)
+
+        res_manual = check_and_prepare_word_template(manual_path, work_dir=self.test_dir)
+        self.assertTrue(res_manual.is_valid)
+        self.assertEqual(res_manual.layout_mode, "1-UP")
+        self.assertEqual(res_manual.template_type, "MANUAL_TAGS")
+        self.assertTrue("Siap Mailing" in res_manual.status_badge)
+
+    def test_20_mail_merger_1up_mode(self) -> None:
+        if not is_ms_word_installed():
+            self.skipTest("MS Word COM tidak tersedia di lingkungan pengujian ini")
+
+        import docx
+        custom_1up_path = os.path.join(self.test_dir, "template_1up_ready.docx")
+        doc = docx.Document()
+        doc.add_paragraph("SURAT RESMI: {{nama_1}}")
+        doc.add_paragraph("Nomor: {{nomor_1}}")
+        doc.add_paragraph("Jenis Kelamin: {{jk_1}}")
+        doc.add_paragraph("Umur: {{umur_1}}")
+        doc.add_paragraph("Alamat: {{alamat_1}}")
+        doc.save(custom_1up_path)
+
+        out_pdf = os.path.join(self.test_dir, "output_1up.pdf")
+        voters = [
+            VoterData(
+                nomor="1",
+                nama="SURIPTO",
+                jenis_kelamin="Laki-laki",
+                umur="40 Tahun",
+                alamat="RT 01 RW 01",
+                sheet_name="KADUS 1",
+                wilayah="KADUS 1",
+                row_index=1,
+            ),
+            VoterData(
+                nomor="2",
+                nama="WARSIH",
+                jenis_kelamin="Perempuan",
+                umur="38 Tahun",
+                alamat="RT 01 RW 01",
+                sheet_name="KADUS 1",
+                wilayah="KADUS 1",
+                row_index=2,
+            ),
+        ]
+
+        ok, pages, msg = merge_voters_to_pdf_via_word_com(
+            template_docx_path=custom_1up_path,
+            voters=voters,
+            sheet_name="KADUS 1",
+            wilayah_name="KADUS 1",
+            output_pdf_path=out_pdf,
+            layout_mode="1-UP",
+        )
+        self.assertTrue(ok)
+        self.assertEqual(pages, 2)
+        self.assertTrue(os.path.exists(out_pdf))
+
+        ver = verify_kadus_pdf(out_pdf, "KADUS 1", voters, layout_mode="1-UP")
+        self.assertTrue(ver.is_valid)
+        self.assertEqual(ver.expected_pages, 2)
+        self.assertEqual(ver.actual_pages, 2)
+        self.assertEqual(ver.matched_voters, 2)
+
+    def test_21_column_mapper_helpers(self) -> None:
+        from app.ui.components import get_col_letter
+        from app.core.excel_scanner import is_blocked_pii, to_snake_case
+
+        self.assertEqual(get_col_letter(0), "A")
+        self.assertEqual(get_col_letter(25), "Z")
+        self.assertEqual(get_col_letter(26), "AA")
+        self.assertEqual(get_col_letter(27), "AB")
+
+        self.assertTrue(is_blocked_pii("NIK"))
+        self.assertTrue(is_blocked_pii("Nomor Induk Kependudukan (NIK)"))
+        self.assertTrue(is_blocked_pii("No. KK"))
+        self.assertFalse(is_blocked_pii("Nama Lengkap"))
+        self.assertFalse(is_blocked_pii("Tempat Lahir"))
+
+        self.assertEqual(to_snake_case("Tempat Lahir"), "tempat_lahir")
+        self.assertEqual(to_snake_case("TPS / Wilayah"), "tps_wilayah")
 
 if __name__ == "__main__":
     unittest.main()

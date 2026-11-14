@@ -39,6 +39,7 @@ def verify_kadus_pdf(
     pdf_path: str,
     sheet_name: str,
     voters: list[VoterData],
+    layout_mode: str = "2-UP",
 ) -> VerificationResult:
     result = VerificationResult(
         sheet_name=sheet_name,
@@ -60,7 +61,10 @@ def verify_kadus_pdf(
         return result
 
     import math
-    expected_pages = math.ceil(len(voters) / 2) if voters else 0
+    if layout_mode == "1-UP":
+        expected_pages = len(voters)
+    else:
+        expected_pages = math.ceil(len(voters) / 2) if voters else 0
     result.expected_pages = expected_pages
 
     if result.actual_pages != expected_pages:
@@ -75,7 +79,7 @@ def verify_kadus_pdf(
 
     matched = 0
     for idx, voter in enumerate(voters):
-        target_page_idx = idx // 2
+        target_page_idx = idx if layout_mode == "1-UP" else idx // 2
         target_page_num = target_page_idx + 1
 
         if target_page_idx >= len(page_texts):

@@ -63,6 +63,12 @@ FEATURE_REGISTRY: list[dict[str, str]] = [
         "title": "Dual-Tuple Theme Tokens, Kontras Mode Terang, & Toolbar Anti-Clipping",
         "description": "Perbaikan transisi tema instan berbasis Dual-Tuple Colors, penyempurnaan kontras Mode Terang, perbaikan tata letak tombol Sumber Dokumen anti-clipping, dan modernisasi kontrol pengubah tema.",
     },
+    {
+        "version": "1.8.0",
+        "date": "2026-11-14",
+        "title": "Adaptive Word Engine (1-Up/2-Up), Smart Excel Scanner, & Pemetaan Kolom",
+        "description": "Mesin cerdas pemindaian header Excel dengan kamus sinonim dan proteksi Zero PII Leak, deteksi otomatis tata letak Word 1-Up & 2-Up serta dukungan tag manual {{...}}, modal pemetaan kolom interaktif, dan estimasi kebutuhan kertas dinamis.",
+    },
 ]
 
 def get_current_version() -> str:

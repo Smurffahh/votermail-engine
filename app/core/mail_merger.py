@@ -141,6 +141,7 @@ def merge_voters_to_pdf_via_word_com(
     output_pdf_path: str,
     progress_callback: Callable[[int, int, str], None] | None = None,
     cancel_event: threading.Event | None = None,
+    layout_mode: str = "2-UP",
 ) -> tuple[bool, int, str]:
     if not voters:
         return False, 0, "Daftar pemilih kosong."
@@ -155,42 +156,78 @@ def merge_voters_to_pdf_via_word_com(
 
     temp_dir = tempfile.mkdtemp(prefix="mailmerge_work_", dir=str(TEMP_DIR))
     total_voters = len(voters)
-    pages_count = math.ceil(total_voters / 2)
+    pages_count = total_voters if layout_mode == "1-UP" else math.ceil(total_voters / 2)
 
     try:
-        pairs: list[tuple[VoterData, VoterData | None]] = []
-        for i in range(0, total_voters, 2):
-            v1 = voters[i]
-            v2 = voters[i + 1] if (i + 1) < total_voters else None
-            pairs.append((v1, v2))
-
         page_doc_files: list[str] = []
-        for p_idx, (v1, v2) in enumerate(pairs):
-            if cancel_event is not None and cancel_event.is_set():
-                return False, 0, "Proses mailing dibatalkan pengguna."
 
-            ctx = {
-                "nomor_1": v1.nomor,
-                "nama_1": v1.nama,
-                "jk_1": v1.jenis_kelamin,
-                "umur_1": v1.umur,
-                "alamat_1": v1.alamat,
-                "nomor_2": v2.nomor if v2 else "",
-                "nama_2": v2.nama if v2 else "",
-                "jk_2": v2.jenis_kelamin if v2 else "",
-                "umur_2": v2.umur if v2 else "",
-                "alamat_2": v2.alamat if v2 else "",
-            }
+        if layout_mode == "1-UP":
+            for p_idx, v1 in enumerate(voters):
+                if cancel_event is not None and cancel_event.is_set():
+                    return False, 0, "Proses mailing dibatalkan pengguna."
 
-            tpl = DocxTemplate(abs_template)
-            tpl.render(ctx)
-            page_path = os.path.join(temp_dir, f"page_{p_idx}.docx")
-            tpl.save(page_path)
-            page_doc_files.append(page_path)
+                ctx = {
+                    "nomor_1": v1.nomor,
+                    "nama_1": v1.nama,
+                    "jk_1": v1.jenis_kelamin,
+                    "umur_1": v1.umur,
+                    "alamat_1": v1.alamat,
+                    "nomor": v1.nomor,
+                    "nama": v1.nama,
+                    "jk": v1.jenis_kelamin,
+                    "umur": v1.umur,
+                    "alamat": v1.alamat,
+                }
+                for k, v in v1.extra_fields.items():
+                    ctx[k] = v
+                    ctx[f"{k}_1"] = v
 
-            current_done = min((p_idx + 1) * 2, total_voters)
-            if progress_callback:
-                progress_callback(current_done, total_voters, sheet_name)
+                tpl = DocxTemplate(abs_template)
+                tpl.render(ctx)
+                page_path = os.path.join(temp_dir, f"page_{p_idx}.docx")
+                tpl.save(page_path)
+                page_doc_files.append(page_path)
+
+                if progress_callback:
+                    progress_callback(p_idx + 1, total_voters, sheet_name)
+        else:
+            pairs: list[tuple[VoterData, VoterData | None]] = []
+            for i in range(0, total_voters, 2):
+                v1 = voters[i]
+                v2 = voters[i + 1] if (i + 1) < total_voters else None
+                pairs.append((v1, v2))
+
+            for p_idx, (v1, v2) in enumerate(pairs):
+                if cancel_event is not None and cancel_event.is_set():
+                    return False, 0, "Proses mailing dibatalkan pengguna."
+
+                ctx = {
+                    "nomor_1": v1.nomor,
+                    "nama_1": v1.nama,
+                    "jk_1": v1.jenis_kelamin,
+                    "umur_1": v1.umur,
+                    "alamat_1": v1.alamat,
+                    "nomor_2": v2.nomor if v2 else "",
+                    "nama_2": v2.nama if v2 else "",
+                    "jk_2": v2.jenis_kelamin if v2 else "",
+                    "umur_2": v2.umur if v2 else "",
+                    "alamat_2": v2.alamat if v2 else "",
+                }
+                for k, v in v1.extra_fields.items():
+                    ctx[f"{k}_1"] = v
+                if v2:
+                    for k, v in v2.extra_fields.items():
+                        ctx[f"{k}_2"] = v
+
+                tpl = DocxTemplate(abs_template)
+                tpl.render(ctx)
+                page_path = os.path.join(temp_dir, f"page_{p_idx}.docx")
+                tpl.save(page_path)
+                page_doc_files.append(page_path)
+
+                current_done = min((p_idx + 1) * 2, total_voters)
+                if progress_callback:
+                    progress_callback(current_done, total_voters, sheet_name)
 
         if not page_doc_files:
             return False, 0, "Tidak ada halaman yang berhasil dibuat."
@@ -200,6 +237,8 @@ def merge_voters_to_pdf_via_word_com(
         for next_page_file in page_doc_files[1:]:
             if cancel_event is not None and cancel_event.is_set():
                 return False, 0, "Proses mailing dibatalkan pengguna."
+            if layout_mode == "1-UP":
+                composer.doc.add_page_break()
             composer.append(docx.Document(next_page_file))
 
         merged_docx_path = os.path.join(temp_dir, "merged_kadus.docx")
@@ -227,6 +266,7 @@ def generate_preview_via_word(
     template_docx_path: str,
     sample_voters: list[VoterData],
     output_pdf_path: str,
+    layout_mode: str = "2-UP",
 ) -> tuple[bool, str, str]:
     if not sample_voters:
         sample_voters = [
@@ -251,7 +291,7 @@ def generate_preview_via_word(
                 row_index=13,
             ),
         ]
-    elif len(sample_voters) == 1:
+    elif len(sample_voters) == 1 and layout_mode == "2-UP":
         sample_voters = [
             sample_voters[0],
             VoterData(
@@ -266,12 +306,14 @@ def generate_preview_via_word(
             ),
         ]
 
+    limit = 1 if layout_mode == "1-UP" else 2
     ok, pages, msg = merge_voters_to_pdf_via_word_com(
         template_docx_path=template_docx_path,
-        voters=sample_voters[:2],
+        voters=sample_voters[:limit],
         sheet_name=sample_voters[0].sheet_name,
         wilayah_name=sample_voters[0].wilayah,
         output_pdf_path=output_pdf_path,
+        layout_mode=layout_mode,
     )
     final_pdf = to_win_abs_path(output_pdf_path)
     if ok and os.path.exists(final_pdf):

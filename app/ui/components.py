@@ -7,8 +7,9 @@ import importlib.metadata
 import os
 from pathlib import Path
 import sys
-from typing import Callable, Literal
+from typing import Any, Callable, Literal
 import webbrowser
+from tkinter import messagebox
 import customtkinter as ctk
 
 from app.config.theme import THEME, ThemeTokens
@@ -21,7 +22,7 @@ from app.config.version import (
     __version__,
     FEATURE_REGISTRY,
 )
-from app.core.excel_scanner import VoterData
+from app.core.excel_scanner import VoterData, is_blocked_pii
 
 class DocumentSourceRow(ctk.CTkFrame):
     """Komponen 2 baris rapi untuk sumber dokumen Word dan Excel dengan toolbar anti-clipping."""
@@ -36,6 +37,7 @@ class DocumentSourceRow(ctk.CTkFrame):
         on_recheck: Callable[[], None],
         on_preview: Callable[[], None] | None = None,
         recheck_label: str = "Cek Ulang",
+        on_map_columns: Callable[[], None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -52,6 +54,7 @@ class DocumentSourceRow(ctk.CTkFrame):
         self.on_browse = on_browse
         self.on_recheck = on_recheck
         self.on_preview = on_preview
+        self.on_map_columns = on_map_columns
 
         self._build_ui(recheck_label)
 
@@ -115,7 +118,25 @@ class DocumentSourceRow(ctk.CTkFrame):
         )
         self.btn_browse.pack(side="left", padx=(0, 6))
 
-        # 2. Tombol Cek Ulang / Scan Ulang (Tombol Sekunder Tegas)
+        # 2. Tombol Atur Kolom (Hanya jika on_map_columns disediakan)
+        if self.on_map_columns:
+            self.btn_map_col = ctk.CTkButton(
+                self.btn_row,
+                text="Atur Kolom",
+                command=self.on_map_columns,
+                fg_color=THEME["btn_secondary_bg"],
+                hover_color=THEME["btn_secondary_hover"],
+                border_width=1,
+                border_color=THEME["btn_secondary_border"],
+                text_color=THEME["btn_secondary_text"],
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+                width=90,
+                height=30,
+                corner_radius=6,
+            )
+            self.btn_map_col.pack(side="left", padx=(0, 6))
+
+        # 3. Tombol Cek Ulang / Scan Ulang (Tombol Sekunder Tegas)
         recheck_width = 95 if is_word else 100
         self.btn_recheck = ctk.CTkButton(
             self.btn_row,
@@ -784,3 +805,211 @@ class AboutModal(ctk.CTkToplevel):
                     wraplength=480,
                     justify="left",
                 ).pack(anchor="w", pady=(1, 0))
+
+def get_col_letter(idx: int) -> str:
+    result = ""
+    idx += 1
+    while idx > 0:
+        idx, rem = divmod(idx - 1, 26)
+        result = chr(65 + rem) + result
+    return result
+
+class ColumnMapperModal(ctk.CTkToplevel):
+    """Modal pemetaan kolom Excel DPT kustom dengan proteksi Zero PII Leak."""
+
+    def __init__(
+        self,
+        parent: Any,
+        theme: ThemeTokens,
+        available_columns: list[tuple[int, str]],
+        current_mapping: dict[str, int],
+        on_apply: Callable[[dict[str, int]], None],
+        header_row_index: int = 0,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(parent, **kwargs)
+        self.theme = theme
+        self.available_columns = available_columns
+        self.current_mapping = dict(current_mapping)
+        self.on_apply = on_apply
+        self.header_row_index = header_row_index
+
+        self.title("Pemetaan Kolom Excel DPT — VoterMail Engine")
+        self.geometry("540x590")
+        self.resizable(False, False)
+        self.configure(fg_color=THEME["bg_root"])
+        self.transient(parent)
+        self.grab_set()
+
+        self.field_vars: dict[str, ctk.StringVar] = {}
+        self.label_to_col_idx: dict[str, int | None] = {}
+
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        container = ctk.CTkFrame(
+            self,
+            fg_color=THEME["bg_card"],
+            border_color=THEME["border_card"],
+            border_width=1,
+            corner_radius=self.theme.corner_radius_card,
+        )
+        container.pack(fill="both", expand=True, padx=16, pady=16)
+
+        header_box = ctk.CTkFrame(container, fg_color="transparent")
+        header_box.pack(fill="x", padx=16, pady=(14, 8))
+
+        ctk.CTkLabel(
+            header_box,
+            text="Pemetaan Kolom Data Excel",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=15, weight="bold"),
+            text_color=THEME["text_primary"],
+        ).pack(anchor="w")
+
+        ctk.CTkLabel(
+            header_box,
+            text="Pilih kolom yang sesuai dari berkas Excel Anda. Kolom NIK diblokir permanen demi keamanan data warga.",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            text_color=THEME["text_secondary"],
+            wraplength=480,
+            justify="left",
+        ).pack(anchor="w", pady=(2, 4))
+
+        info_pill = ctk.CTkFrame(
+            header_box,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
+            border_width=1,
+            corner_radius=6,
+        )
+        info_pill.pack(anchor="w", pady=(4, 0))
+
+        ctk.CTkLabel(
+            info_pill,
+            text=f"Baris Header Terdeteksi: Baris {self.header_row_index + 1} • {len(self.available_columns)} Kolom Terbaca",
+            font=ctk.CTkFont(family=self.theme.font_family_mono, size=10, weight="bold"),
+            text_color=THEME["status_ready_text"],
+        ).pack(padx=8, pady=3)
+
+        empty_label = "(Tidak Digunakan / Kosongkan)"
+        self.label_to_col_idx[empty_label] = None
+        col_options = [empty_label]
+        col_idx_to_label: dict[int, str] = {}
+
+        for col_idx, col_name in self.available_columns:
+            if not is_blocked_pii(col_name):
+                col_letter = get_col_letter(col_idx)
+                opt_str = f"{col_name} (Kolom {col_letter})"
+                col_options.append(opt_str)
+                self.label_to_col_idx[opt_str] = col_idx
+                col_idx_to_label[col_idx] = opt_str
+
+        form_scroll = ctk.CTkScrollableFrame(
+            container,
+            fg_color="transparent",
+            height=320,
+        )
+        form_scroll.pack(fill="both", expand=True, padx=16, pady=(4, 8))
+
+        fields = [
+            ("nama", "Nama Pemilih *", True, "Kolom utama nama lengkap pemilih pada surat."),
+            ("no", "Nomor Urut", False, "Bawaan penomoran otomatis jika dikosongkan."),
+            ("jk", "Jenis Kelamin (L/P)", False, "Diubah otomatis menjadi Laki-laki / Perempuan."),
+            ("umur", "Usia / Umur", False, "Otomatis diformat dengan akhiran 'Tahun'."),
+            ("alamat", "Alamat Domisili", False, "Alamat tempat tinggal pemilih."),
+            ("rt", "RT (Opsional)", False, "Nomor RT pemilih."),
+            ("rw", "RW (Opsional)", False, "Nomor RW pemilih."),
+        ]
+
+        for key, label_text, is_required, hint in fields:
+            row_frame = ctk.CTkFrame(form_scroll, fg_color="transparent")
+            row_frame.pack(fill="x", pady=5)
+
+            left_box = ctk.CTkFrame(row_frame, fg_color="transparent")
+            left_box.pack(side="left", fill="x", expand=True)
+
+            lbl_color = THEME["text_primary"] if not is_required else THEME["btn_accent_soft_text"]
+            ctk.CTkLabel(
+                left_box,
+                text=label_text,
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=12, weight="bold"),
+                text_color=lbl_color,
+            ).pack(anchor="w")
+
+            ctk.CTkLabel(
+                left_box,
+                text=hint,
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=10),
+                text_color=THEME["text_muted"],
+            ).pack(anchor="w")
+
+            curr_idx = self.current_mapping.get(key)
+            default_val = col_idx_to_label.get(curr_idx, empty_label) if curr_idx is not None else empty_label
+
+            var = ctk.StringVar(value=default_val)
+            self.field_vars[key] = var
+
+            opt_menu = ctk.CTkOptionMenu(
+                row_frame,
+                values=col_options,
+                variable=var,
+                width=230,
+                height=30,
+                corner_radius=self.theme.corner_radius_inner,
+                fg_color=THEME["bg_surface"],
+                button_color=THEME["btn_secondary_bg"],
+                button_hover_color=THEME["btn_secondary_hover"],
+                text_color=THEME["text_primary"],
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            )
+            opt_menu.pack(side="right", padx=(8, 0))
+
+        btn_row = ctk.CTkFrame(container, fg_color="transparent")
+        btn_row.pack(fill="x", padx=16, pady=(10, 14))
+
+        ctk.CTkButton(
+            btn_row,
+            text="Batal",
+            width=90,
+            height=34,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_width=1,
+            border_color=THEME["border_surface"],
+            text_color=THEME["btn_secondary_text"],
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            corner_radius=self.theme.corner_radius_inner,
+            command=self.destroy,
+        ).pack(side="right", padx=(8, 0))
+
+        ctk.CTkButton(
+            btn_row,
+            text="Terapkan & Scan Ulang",
+            height=34,
+            fg_color=THEME["btn_primary_bg"],
+            hover_color=THEME["btn_primary_hover"],
+            text_color=THEME["btn_primary_text"],
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            corner_radius=self.theme.corner_radius_inner,
+            command=self._apply_and_close,
+        ).pack(side="right")
+
+    def _apply_and_close(self) -> None:
+        nama_choice = self.field_vars["nama"].get()
+        nama_idx = self.label_to_col_idx.get(nama_choice)
+        if nama_idx is None:
+            messagebox.showwarning(
+                "Peringatan",
+                "Kolom 'Nama Pemilih' wajib ditentukan agar aplikasi dapat mencetak surat pemanggilan.",
+            )
+            return
+
+        new_map: dict[str, int] = {}
+        for k, var in self.field_vars.items():
+            choice = var.get()
+            idx = self.label_to_col_idx.get(choice)
+            if idx is not None:
+                new_map[k] = idx
+
+        self.on_apply(new_map)
+        self.destroy()
