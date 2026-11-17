@@ -56,6 +56,7 @@ def run_pyinstaller() -> None:
         "--hidden-import=openpyxl",
         "--hidden-import=docxtpl",
         "--hidden-import=docxcompose",
+        "--collect-data=docxcompose",
         "--hidden-import=pypdf",
         "--hidden-import=pydantic",
         str(BASE_DIR / "main.py"),

@@ -1184,6 +1184,9 @@ class MainWindow(ctk.CTk):
                     overall = processed_voters_acc + cur
                     self.worker_queue.put(("progress_update", (overall, total_voters_all, sheet)))
 
+                def phase_cb(phase_text: str, pct: float) -> None:
+                    self.worker_queue.put(("phase_update", (phase_text, pct)))
+
                 ok, pages, msg = merge_voters_to_pdf_via_word_com(
                     template_docx_path=template_doc,
                     voters=s.voters,
@@ -1191,6 +1194,7 @@ class MainWindow(ctk.CTk):
                     wilayah_name=s.wilayah_text,
                     output_pdf_path=out_pdf,
                     progress_callback=prog_cb,
+                    phase_callback=phase_cb,
                     cancel_event=self.cancel_event,
                     layout_mode=layout_mode,
                 )
@@ -1263,6 +1267,11 @@ class MainWindow(ctk.CTk):
                         eta_sec = rem / speed if speed > 0 else 0
                         mins, secs = divmod(int(eta_sec), 60)
                         self.eta_label.configure(text=f"Estimasi Sisa: {mins:02d}:{secs:02d} ({speed:.1f} pemilih/dtk)")
+
+                elif msg_type == "phase_update":
+                    phase_text, _ = payload
+                    self.badge_mailing.set_status("Memproses...", "process")
+                    self.status_detail_label.configure(text=phase_text)
 
                 elif msg_type == "kadus_completed":
                     sheet_name, out_pdf = payload

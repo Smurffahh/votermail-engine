@@ -69,6 +69,12 @@ FEATURE_REGISTRY: list[dict[str, str]] = [
         "title": "Adaptive Word Engine (1-Up/2-Up), Smart Excel Scanner, & Pemetaan Kolom",
         "description": "Mesin cerdas pemindaian header Excel dengan kamus sinonim dan proteksi Zero PII Leak, deteksi otomatis tata letak Word 1-Up & 2-Up serta dukungan tag manual {{...}}, modal pemetaan kolom interaktif, dan estimasi kebutuhan kertas dinamis.",
     },
+    {
+        "version": "1.8.1",
+        "date": "2026-11-17",
+        "title": "Fix Build docxcompose & Progres Bar Granular Real-Time",
+        "description": "Perbaikan bug file template docxcompose yang hilang pada versi .EXE (Errno 2) dan penyempurnaan progress bar real-time untuk pemrosesan ribuan data.",
+    },
 ]
 
 def get_current_version() -> str:

@@ -140,6 +140,7 @@ def merge_voters_to_pdf_via_word_com(
     wilayah_name: str,
     output_pdf_path: str,
     progress_callback: Callable[[int, int, str], None] | None = None,
+    phase_callback: Callable[[str, float], None] | None = None,
     cancel_event: threading.Event | None = None,
     layout_mode: str = "2-UP",
 ) -> tuple[bool, int, str]:
@@ -160,6 +161,10 @@ def merge_voters_to_pdf_via_word_com(
 
     try:
         page_doc_files: list[str] = []
+        display_name = wilayah_name or sheet_name
+
+        if phase_callback:
+            phase_callback(f"Menyiapkan {display_name}...", 0.0)
 
         if layout_mode == "1-UP":
             for p_idx, v1 in enumerate(voters):
@@ -190,6 +195,9 @@ def merge_voters_to_pdf_via_word_com(
 
                 if progress_callback:
                     progress_callback(p_idx + 1, total_voters, sheet_name)
+                if phase_callback and ((p_idx + 1) % 10 == 0 or (p_idx + 1) == total_voters):
+                    pct = (p_idx + 1) / total_voters
+                    phase_callback(f"Menyuntikkan data ke Word... ({int(pct * 100)}%)", pct)
         else:
             pairs: list[tuple[VoterData, VoterData | None]] = []
             for i in range(0, total_voters, 2):
@@ -228,9 +236,15 @@ def merge_voters_to_pdf_via_word_com(
                 current_done = min((p_idx + 1) * 2, total_voters)
                 if progress_callback:
                     progress_callback(current_done, total_voters, sheet_name)
+                if phase_callback and ((p_idx + 1) % 10 == 0 or current_done == total_voters):
+                    pct = current_done / total_voters
+                    phase_callback(f"Menyuntikkan data ke Word... ({int(pct * 100)}%)", pct)
 
         if not page_doc_files:
             return False, 0, "Tidak ada halaman yang berhasil dibuat."
+
+        if phase_callback:
+            phase_callback(f"Menggabungkan {len(page_doc_files)} halaman Word...", 0.95)
 
         base_doc = docx.Document(page_doc_files[0])
         composer = Composer(base_doc)
@@ -246,6 +260,10 @@ def merge_voters_to_pdf_via_word_com(
 
         if cancel_event is not None and cancel_event.is_set():
             return False, 0, "Proses mailing dibatalkan pengguna."
+
+        display_name = wilayah_name or sheet_name
+        if phase_callback:
+            phase_callback(f"Menyimpan PDF {display_name}... (Jangan tutup aplikasi)", 0.98)
 
         ok, msg, final_pdf = export_docx_to_pdf_via_word(merged_docx_path, abs_target_pdf)
         if not ok:
