@@ -130,6 +130,18 @@ FEATURE_REGISTRY: list[dict[str, Any]] = [
             "Penggantian 100% tkinter.messagebox dengan ModernNotificationModal (Success, Warning, Error, Confirm) dan InAppToastBanner.",
         ],
     },
+    {
+        "version": "1.10.1",
+        "date": "2026-11-18",
+        "title": "Sistem Tema DaisyUI (Garden & Night), FilterStatusBanner, & Monospace Log",
+        "description": "Perombakan sistem tema visual dengan skema DaisyUI Garden & Night, penataan ulang formulir Seksi 3 dengan label teratur 135px & tombol Pratinjau 1 Halaman di header, penambahan FilterStatusBanner 4-status, serta formatting log sistem monospace dengan tag warna dinamis.",
+        "highlights": [
+            "Penerapan palet DaisyUI Garden (Mode Terang) dan DaisyUI Night (Mode Gelap) dengan token radius konsentris 16px, 8px, 8px, 6px.",
+            "Penataan ulang kartu '3. Pengaturan & Cetak PDF' dengan perataan vertikal label 135px dan tombol 'Pratinjau 1 Halaman' di header kanan atas.",
+            "Penambahan FilterStatusBanner dengan umpan balik visual 4-status (Semua Pemilih, Belum Diisi, Aktif Cocok, Tidak Ada Data Cocok).",
+            "Pemformatan log sistem monospace berlebar tetap dengan tag warna kategori dinamis dan tabel pratinjau ASCII 5 pemilih pertama.",
+        ],
+    },
 ]
 
 def get_latest_release_entry() -> dict[str, Any]:

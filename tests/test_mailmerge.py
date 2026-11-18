@@ -525,8 +525,12 @@ class TestMailMergeApp(unittest.TestCase):
             VoterPreviewTable,
             AboutModal,
         )
-        self.assertEqual(DARK_THEME.primary_action, ("#10B981", "#10B981"))
-        self.assertEqual(LIGHT_THEME.primary_action, ("#10B981", "#10B981"))
+        self.assertEqual(DARK_THEME.primary_action, ("#FE0075", "#38BDF8"))
+        self.assertEqual(LIGHT_THEME.primary_action, ("#FE0075", "#38BDF8"))
+        self.assertEqual(DARK_THEME.corner_radius_card, 16)
+        self.assertEqual(DARK_THEME.corner_radius_inner, 8)
+        self.assertEqual(DARK_THEME.corner_radius_control, 8)
+        self.assertEqual(DARK_THEME.corner_radius_badge, 6)
         self.assertEqual(get_theme("Dark").name, "Dark")
         self.assertEqual(get_theme("Light").name, "Light")
 
@@ -1047,7 +1051,7 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(parse_version_tuple(""), (0, 0, 0))
 
         latest = get_latest_release_entry()
-        self.assertEqual(latest.get("version"), "1.9.1")
+        self.assertEqual(latest.get("version"), __version__)
         self.assertIn("highlights", latest)
         self.assertGreater(len(latest["highlights"]), 0)
 
@@ -1255,6 +1259,84 @@ class TestMailMergeApp(unittest.TestCase):
             modal_err.destroy()
         finally:
             root.destroy()
+
+    def test_34_daisyui_theme_filter_banner_and_structured_logs(self) -> None:
+        from app.config.theme import THEME, ThemeTokens, DARK_THEME, LIGHT_THEME
+        from app.ui.components import FilterStatusBanner
+        from app.ui.main_window import shorten_path, format_voter_preview_table
+        import customtkinter as ctk
+
+        # 1. DaisyUI Garden & Night token verification
+        self.assertEqual(THEME["bg_root"], ("#D4D2D2", "#090E1A"))
+        self.assertEqual(THEME["bg_card"], ("#E9E7E7", "#0F172A"))
+        self.assertEqual(THEME["btn_primary_bg"], ("#FE0075", "#38BDF8"))
+        self.assertEqual(THEME["btn_neutral_bg"], ("#291E00", "#1E293B"))
+
+        theme_dark = ThemeTokens()
+        self.assertEqual(theme_dark.corner_radius_card, 16)
+        self.assertEqual(theme_dark.corner_radius_inner, 8)
+        self.assertEqual(theme_dark.corner_radius_control, 8)
+        self.assertEqual(theme_dark.corner_radius_badge, 6)
+
+        # 2. FilterStatusBanner states verification
+        root = ctk.CTk()
+        root.withdraw()
+        try:
+            banner = FilterStatusBanner(root, theme=theme_dark)
+            self.assertEqual(banner.current_state, "all")
+
+            # State 'all'
+            banner.set_status("all", "STATUS CETAK: Semua Pemilih • Total 150 Pemilih (2 Kadus)")
+            self.assertEqual(banner.current_state, "all")
+            self.assertEqual(banner.label_icon.cget("text"), "ℹ")
+            self.assertIn("Semua Pemilih", banner.label_msg.cget("text"))
+
+            # State 'empty'
+            banner.set_status("empty", "FILTER BELUM DIISI: Ketik kriteria filter")
+            self.assertEqual(banner.current_state, "empty")
+            self.assertEqual(banner.label_icon.cget("text"), "⚠")
+            self.assertIn("FILTER BELUM DIISI", banner.label_msg.cget("text"))
+
+            # State 'active'
+            banner.set_status("active", "FILTER DITERAPKAN: [Nomor Urut: 1-10] • Menyaring 10 Pemilih")
+            self.assertEqual(banner.current_state, "active")
+            self.assertEqual(banner.label_icon.cget("text"), "✓")
+            self.assertIn("FILTER DITERAPKAN", banner.label_msg.cget("text"))
+
+            # State 'no_match'
+            banner.set_status("no_match", "TIDAK ADA DATA COCOK: 0 pemilih ditemukan")
+            self.assertEqual(banner.current_state, "no_match")
+            self.assertEqual(banner.label_icon.cget("text"), "✕")
+            self.assertIn("TIDAK ADA DATA COCOK", banner.label_msg.cget("text"))
+
+            # Theme refresh
+            banner.update_theme(LIGHT_THEME)
+            self.assertEqual(banner.theme.name, "Light")
+        finally:
+            root.destroy()
+
+        # 3. shorten_path verification
+        cwd_file = Path.cwd() / "app" / "config" / "theme.py"
+        rel_short = shorten_path(cwd_file)
+        self.assertTrue("app" in rel_short and "theme.py" in rel_short)
+        self.assertFalse(str(Path.cwd().resolve()) in rel_short)
+
+        deep_file = "D:\\Pilkades2026\\DesaKarangjengkol\\Dokumen\\C1\\KADUS_01.pdf"
+        short_deep = shorten_path(deep_file)
+        self.assertTrue(short_deep.startswith("...\\") or short_deep.startswith(".../"))
+        self.assertTrue(short_deep.endswith("KADUS_01.pdf"))
+
+        # 4. format_voter_preview_table verification
+        samples = [
+            "No: 1 | Nama: ADE SETIAWAN | JK: L | Umur: 32 | Alamat: DUSUN 01 RT 001 RW 001",
+            "No: 125 | Nama: MUHAMMAD ABDURRAHMAN WAHID AL-FATIH | JK: L | Umur: 45 | Alamat: DUSUN 02 RT 003 RW 002",
+        ]
+        table_lines = format_voter_preview_table(samples)
+        self.assertTrue(any("┌" in l for l in table_lines))
+        self.assertTrue(any("│ No   │" in l for l in table_lines))
+        self.assertTrue(any("ADE SETIAWAN" in l for l in table_lines))
+        self.assertTrue(any("MUHAMMAD ABDURRAHMAN ..." in l for l in table_lines))
+        self.assertTrue(any("└" in l for l in table_lines))
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,67 +7,76 @@ from dataclasses import dataclass
 from typing import Literal
 
 # Native Dual-Tuple Color Tokens (LIGHT_HEX, DARK_HEX) for CustomTkinter
+# Skema Warna: DaisyUI "garden" (Light Mode) & DaisyUI "night" (Dark Mode)
 THEME: dict[str, tuple[str, str]] = {
-    # Background & Surfaces
-    "bg_root": ("#F1F5F9", "#090D16"),          # Slate 100 (Light) | Deep Night (Dark)
-    "bg_card": ("#FFFFFF", "#111726"),          # Pure White (Light) | Slate 900 (Dark)
-    "bg_surface": ("#F8FAFC", "#161F30"),       # Slate 50 (Light) | Inner Card Surface (Dark)
-    "bg_elevated": ("#F1F5F9", "#1E293B"),      # Kotak Progress & Header Tabel
-    "bg_hover": ("#E2E8F0", "#1E293B"),         # Hover highlight row
+    # Background & Surfaces (DaisyUI Garden | DaisyUI Night)
+    "bg_root": ("#D4D2D2", "#090E1A"),          # Base-200 (Garden) | Base-200 (Night)
+    "bg_card": ("#E9E7E7", "#0F172A"),          # Base-100 (Garden) | Base-100 (Night)
+    "bg_surface": ("#F5F4F4", "#1E293B"),       # Lighter Base-100 / Inner | Slate 800
+    "bg_elevated": ("#DFDDDD", "#162033"),      # Kotak Progress & Header Tabel
+    "bg_hover": ("#D0CECE", "#26354D"),         # Hover highlight row
 
     # Borders & Dividers
-    "border_card": ("#E2E8F0", "#1E293B"),      # Hairline border kartu utama
-    "border_surface": ("#CBD5E1", "#26334D"),   # Border sub-kartu & input
-    "border_subtle": ("#E2E8F0", "#1E293B"),    # Alias kompatibilitas
+    "border_card": ("#BFBDBD", "#2E3C56"),      # Hairline border struktural 1px kartu utama
+    "border_surface": ("#B2AFAF", "#334460"),   # Border sub-kartu, tombol & input
+    "border_subtle": ("#BFBDBD", "#2E3C56"),    # Alias kompatibilitas
 
-    # Typography (100% Terbaca Jelas di Kedua Mode - WCAG AA)
-    "text_primary": ("#0F172A", "#F8FAFC"),     # Slate 900 Hitam Pekat (Light) | Putih Bersih (Dark)
-    "text_secondary": ("#334155", "#94A3B8"),   # Slate 700 (Light) | Slate 400 (Dark)
-    "text_muted": ("#64748B", "#64748B"),       # Slate 500
+    # Typography (WCAG AA Compliant)
+    "text_primary": ("#100F0F", "#C8CAD0"),     # Deep near-black (Garden) | Muted soft white (Night)
+    "text_secondary": ("#3D3A3A", "#94A3B8"),   # Slate secondary (Garden) | Slate 400 (Night)
+    "text_muted": ("#6E6A6A", "#64748B"),       # Slate muted (Garden) | Slate 500 (Night)
 
-    # Secondary Interactive Buttons (Jelas Terlihat Sebagai Tombol!)
-    "btn_secondary_bg": ("#EEF2F6", "#1E293B"),
-    "btn_secondary_hover": ("#E2E8F0", "#334155"),
-    "btn_secondary_border": ("#94A3B8", "#3B82F6"),
-    "btn_secondary_text": ("#0F172A", "#F8FAFC"),
+    # Secondary Interactive Buttons (DaisyUI Garden Neutral/Rose | DaisyUI Night Indigo)
+    "btn_secondary_bg": ("#DCDADA", "#1E293B"),
+    "btn_secondary_hover": ("#CECBCB", "#334155"),
+    "btn_secondary_border": ("#B2AFAF", "#475569"),
+    "btn_secondary_text": ("#100F0F", "#E2E8F0"),
 
-    # Soft Accent Buttons (Untuk Tombol "Pilih File" & "Pratinjau PDF")
-    "btn_accent_soft_bg": ("#EFF6FF", "#172554"),
-    "btn_accent_soft_hover": ("#DBEAFE", "#1E3A8A"),
-    "btn_accent_soft_border": ("#60A5FA", "#2563EB"),
-    "btn_accent_soft_text": ("#1D4ED8", "#93C5FD"),
+    # Soft Accent Buttons / Secondary CTA ("Pratinjau 1 Halaman" & "Pilih File")
+    "btn_accent_soft_bg": ("#E8D6DD", "#1E1F3B"),      # Garden rose soft | Night indigo soft
+    "btn_accent_soft_hover": ("#D9C0CB", "#2B2D54"),
+    "btn_accent_soft_border": ("#8E4162", "#818CF8"),
+    "btn_accent_soft_text": ("#8E4162", "#818CF8"),
 
-    # Primary CTA Button ("Buat File PDF Sekarang")
-    "btn_primary_bg": ("#10B981", "#10B981"),
-    "btn_primary_hover": ("#059669", "#059669"),
-    "btn_primary_text": ("#FFFFFF", "#FFFFFF"),
+    # Neutral / Utility Buttons ("Bersihkan", "Ubah Folder")
+    "btn_neutral_bg": ("#291E00", "#1E293B"),
+    "btn_neutral_hover": ("#3D2D00", "#334155"),
+    "btn_neutral_border": ("#1A1300", "#334155"),
+    "btn_neutral_text": ("#E9E7E7", "#CDD0D6"),
+
+    # Primary CTA Button ("Mulai Buat Surat PDF")
+    "btn_primary_bg": ("#FE0075", "#38BDF8"),          # Garden primary rose-pink | Night primary sky blue
+    "btn_primary_hover": ("#D90064", "#0EA5E9"),
+    "btn_primary_text": ("#FFFFFF", "#001019"),
 
     # Cancel / Danger Button
-    "btn_danger_bg": ("#FEE2E2", "#7F1D1D"),
-    "btn_danger_hover": ("#FECACA", "#991B1B"),
-    "btn_danger_text": ("#B91C1C", "#FCA5A5"),
-    "btn_disabled_bg": ("#E2E8F0", "#161F30"),
-    "btn_disabled_text": ("#94A3B8", "#475569"),
+    "btn_danger_bg": ("#FFE4E6", "#311018"),
+    "btn_danger_hover": ("#FECDD3", "#4A1824"),
+    "btn_danger_text": ("#C81E2B", "#FB7185"),
+    "btn_disabled_bg": ("#DCDADA", "#162033"),
+    "btn_disabled_text": ("#8F8B8B", "#4B5563"),
 
     # Status Badges & Accents
-    "status_ready_bg": ("#ECFDF5", "#064E3B"),
-    "status_ready_text": ("#047857", "#34D399"),
-    "status_warn_bg": ("#FFFBEB", "#78350F"),
-    "status_warn_text": ("#B45309", "#FBBF24"),
-    "status_error_bg": ("#FEF2F2", "#7F1D1D"),
-    "status_error_text": ("#DC2626", "#F87171"),
-    "status_neutral_bg": ("#F1F5F9", "#1E293B"),
-    "status_neutral_text": ("#475569", "#94A3B8"),
-    "metric_value": ("#0F172A", "#F8FAFC"),
+    "status_ready_bg": ("#D1FAE5", "#0D2E2B"),
+    "status_ready_text": ("#007A4F", "#2DD4BF"),
+    "status_warn_bg": ("#FEF3C7", "#2E2410"),
+    "status_warn_text": ("#926B00", "#F4BF50"),
+    "status_error_bg": ("#FFE4E6", "#311018"),
+    "status_error_text": ("#C81E2B", "#FB7185"),
+    "status_info_bg": ("#E0F2FE", "#0C2538"),
+    "status_info_text": ("#0077AD", "#38BDF8"),
+    "status_neutral_bg": ("#DCDADA", "#1E293B"),
+    "status_neutral_text": ("#575353", "#94A3B8"),
+    "metric_value": ("#100F0F", "#C8CAD0"),
 }
 
 @dataclass(frozen=True)
 class ThemeTokens:
     name: str = "Dark"
-    corner_radius_card: int = 12
+    corner_radius_card: int = 16
     corner_radius_inner: int = 8
-    corner_radius_control: int = 6
-    corner_radius_badge: int = 4
+    corner_radius_control: int = 8
+    corner_radius_badge: int = 6
     font_family_main: str = "Segoe UI"
     font_family_mono: str = "Consolas"
 
@@ -125,6 +134,12 @@ class ThemeTokens:
     @property
     def status_neutral_bg(self) -> tuple[str, str]: return THEME["status_neutral_bg"]
     @property
+    def status_info(self) -> tuple[str, str]: return THEME["status_info_text"]
+    @property
+    def status_info_text(self) -> tuple[str, str]: return THEME["status_info_text"]
+    @property
+    def status_info_bg(self) -> tuple[str, str]: return THEME["status_info_bg"]
+    @property
     def btn_secondary_bg(self) -> tuple[str, str]: return THEME["btn_secondary_bg"]
     @property
     def btn_secondary_hover(self) -> tuple[str, str]: return THEME["btn_secondary_hover"]
@@ -140,6 +155,14 @@ class ThemeTokens:
     def btn_accent_soft_border(self) -> tuple[str, str]: return THEME["btn_accent_soft_border"]
     @property
     def btn_accent_soft_text(self) -> tuple[str, str]: return THEME["btn_accent_soft_text"]
+    @property
+    def btn_neutral_bg(self) -> tuple[str, str]: return THEME["btn_neutral_bg"]
+    @property
+    def btn_neutral_hover(self) -> tuple[str, str]: return THEME["btn_neutral_hover"]
+    @property
+    def btn_neutral_border(self) -> tuple[str, str]: return THEME["btn_neutral_border"]
+    @property
+    def btn_neutral_text(self) -> tuple[str, str]: return THEME["btn_neutral_text"]
     @property
     def btn_primary_bg(self) -> tuple[str, str]: return THEME["btn_primary_bg"]
     @property

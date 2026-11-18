@@ -144,6 +144,81 @@ class InAppToastBanner(ctk.CTkFrame):
             self._timer_id = None
         self.pack_forget()
 
+class FilterStatusBanner(ctk.CTkFrame):
+    def __init__(self, parent: Any, theme: ThemeTokens | None = None, **kwargs: Any) -> None:
+        self.theme = theme or ThemeTokens()
+        super().__init__(
+            parent,
+            fg_color=THEME["status_info_bg"],
+            border_color=THEME["status_info_text"],
+            border_width=1,
+            corner_radius=self.theme.corner_radius_badge,
+            height=30,
+            **kwargs,
+        )
+        self.current_state: Literal["all", "empty", "active", "no_match"] = "all"
+        self.current_message = ""
+
+        self.label_icon = ctk.CTkLabel(
+            self,
+            text="ℹ",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=12, weight="bold"),
+            text_color=THEME["status_info_text"],
+            width=22,
+        )
+        self.label_icon.pack(side="left", padx=(10, 4), pady=4)
+
+        self.label_msg = ctk.CTkLabel(
+            self,
+            text="",
+            font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
+            text_color=THEME["text_primary"],
+            anchor="w",
+            justify="left",
+        )
+        self.label_msg.pack(side="left", fill="x", expand=True, padx=(0, 10), pady=4)
+
+    def set_status(
+        self,
+        state: Literal["all", "empty", "active", "no_match"],
+        message: str,
+    ) -> None:
+        self.current_state = state
+        self.current_message = message
+
+        if state == "all":
+            icon = "ℹ"
+            bg = THEME["status_info_bg"]
+            border = THEME["status_info_text"]
+            fg = THEME["status_info_text"]
+            text_col = THEME["text_primary"]
+        elif state == "empty":
+            icon = "⚠"
+            bg = THEME["status_warn_bg"]
+            border = THEME["status_warn_text"]
+            fg = THEME["status_warn_text"]
+            text_col = THEME["text_primary"]
+        elif state == "active":
+            icon = "✓"
+            bg = THEME["status_ready_bg"]
+            border = THEME["status_ready_text"]
+            fg = THEME["status_ready_text"]
+            text_col = THEME["text_primary"]
+        else:
+            icon = "✕"
+            bg = THEME["status_error_bg"]
+            border = THEME["status_error_text"]
+            fg = THEME["status_error_text"]
+            text_col = THEME["status_error_text"]
+
+        self.configure(fg_color=bg, border_color=border)
+        self.label_icon.configure(text=icon, text_color=fg)
+        self.label_msg.configure(text=message, text_color=text_col)
+
+    def update_theme(self, theme: ThemeTokens) -> None:
+        self.theme = theme
+        self.set_status(self.current_state, self.current_message)
+
 class ModernNotificationModal(ctk.CTkToplevel):
     def __init__(
         self,

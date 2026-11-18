@@ -81,6 +81,7 @@ from app.ui.components import (
     KadusRowItem,
     VoterPreviewTable,
     StatusBadge,
+    FilterStatusBanner,
     AboutModal,
     ColumnMapperModal,
     UpdateNotificationModal,
@@ -96,6 +97,50 @@ def format_elapsed_time(seconds: float) -> str:
     if hours > 0:
         return f"{hours:02d}:{mins:02d}:{secs:02d}"
     return f"{mins:02d}:{secs:02d}"
+
+def shorten_path(path: str | Path | None, max_len: int = 42) -> str:
+    if not path:
+        return ""
+    p = Path(path)
+    try:
+        rel = p.relative_to(Path.cwd())
+        res = str(rel)
+    except Exception:
+        parts = p.parts
+        if len(parts) > 3:
+            res = f"...\\{parts[-2]}\\{parts[-1]}"
+        else:
+            res = str(p)
+    if len(res) > max_len:
+        res = f"...\\{p.name}"
+    return res
+
+def format_voter_preview_table(samples: list[str]) -> list[str]:
+    w_no, w_nama, w_jk, w_umur, w_alamat = 4, 24, 4, 5, 24
+    def clip(t: Any, w: int) -> str:
+        s = str(t).strip()
+        return (s[:w-3] + "...") if len(s) > w else s.ljust(w)
+
+    top = "┌─" + "─"*w_no + "─┬─" + "─"*w_nama + "─┬─" + "─"*w_jk + "─┬─" + "─"*w_umur + "─┬─" + "─"*w_alamat + "─┐"
+    hdr = "│ " + clip("No", w_no) + " │ " + clip("Nama", w_nama) + " │ " + clip("L/P", w_jk) + " │ " + clip("Usia", w_umur) + " │ " + clip("Alamat", w_alamat) + " │"
+    mid = "├─" + "─"*w_no + "─┼─" + "─"*w_nama + "─┼─" + "─"*w_jk + "─┼─" + "─"*w_umur + "─┼─" + "─"*w_alamat + "─┤"
+    bot = "└─" + "─"*w_no + "─┴─" + "─"*w_nama + "─┴─" + "─"*w_jk + "─┴─" + "─"*w_umur + "─┴─" + "─"*w_alamat + "─┘"
+
+    table_lines = [top, hdr, mid]
+    for s in samples:
+        parts: dict[str, str] = {}
+        for seg in s.split(" | "):
+            if ":" in seg:
+                k, v = seg.split(":", 1)
+                parts[k.strip().lower()] = v.strip()
+        no = clip(parts.get("no", "-"), w_no)
+        nama = clip(parts.get("nama", "-"), w_nama)
+        jk = clip(parts.get("jk", "-"), w_jk)
+        umur = clip(parts.get("umur", "-"), w_umur)
+        alamat = clip(parts.get("alamat", "-"), w_alamat)
+        table_lines.append(f"│ {no} │ {nama} │ {jk} │ {umur} │ {alamat} │")
+    table_lines.append(bot)
+    return table_lines
 
 class MainWindow(ctk.CTk):
     def __init__(self) -> None:
@@ -510,8 +555,27 @@ class MainWindow(ctk.CTk):
             text_color=THEME["text_primary"],
         ).pack(side="left")
 
-        self.badge_mailing = StatusBadge(header, "Menunggu Word & Excel", "neutral", self.theme)
-        self.badge_mailing.pack(side="right")
+        hdr_right = ctk.CTkFrame(header, fg_color="transparent")
+        hdr_right.pack(side="right")
+
+        self.btn_preview_header = ctk.CTkButton(
+            hdr_right,
+            text="Pratinjau 1 Halaman",
+            width=140,
+            height=28,
+            fg_color=THEME["btn_accent_soft_bg"],
+            hover_color=THEME["btn_accent_soft_hover"],
+            border_color=THEME["btn_accent_soft_border"],
+            border_width=1,
+            corner_radius=self.theme.corner_radius_inner,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            text_color=THEME["btn_accent_soft_text"],
+            command=self._generate_preview,
+        )
+        self.btn_preview_header.pack(side="left", padx=(0, 8))
+
+        self.badge_mailing = StatusBadge(hdr_right, "Menunggu Word & Excel", "neutral", self.theme)
+        self.badge_mailing.pack(side="left")
 
         out_row = ctk.CTkFrame(self.card_exec, fg_color="transparent")
         out_row.pack(fill="x", padx=16, pady=(0, 8))
@@ -519,6 +583,8 @@ class MainWindow(ctk.CTk):
         ctk.CTkLabel(
             out_row,
             text="Folder Hasil PDF:",
+            width=135,
+            anchor="w",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
             text_color=THEME["text_secondary"],
         ).pack(side="left", padx=(0, 8))
@@ -540,7 +606,7 @@ class MainWindow(ctk.CTk):
         self.btn_browse_output = ctk.CTkButton(
             out_row,
             text="Ubah Folder",
-            width=86,
+            width=105,
             height=30,
             fg_color=THEME["btn_secondary_bg"],
             hover_color=THEME["btn_secondary_hover"],
@@ -556,7 +622,7 @@ class MainWindow(ctk.CTk):
         self.btn_open_output = ctk.CTkButton(
             out_row,
             text="Buka Folder",
-            width=86,
+            width=105,
             height=30,
             fg_color=THEME["btn_secondary_bg"],
             hover_color=THEME["btn_secondary_hover"],
@@ -578,6 +644,8 @@ class MainWindow(ctk.CTk):
         ctk.CTkLabel(
             addr_box,
             text="Format Alamat:",
+            width=135,
+            anchor="w",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
             text_color=THEME["text_secondary"],
         ).pack(side="left", padx=(0, 8))
@@ -585,7 +653,7 @@ class MainWindow(ctk.CTk):
         self.address_mode_menu = ctk.CTkOptionMenu(
             addr_box,
             values=ADDRESS_FORMAT_OPTIONS,
-            width=260,
+            width=280,
             height=28,
             fg_color=THEME["btn_secondary_bg"],
             button_color=THEME["btn_secondary_hover"],
@@ -620,11 +688,13 @@ class MainWindow(ctk.CTk):
         self.verify_switch.pack(side="right")
 
         filter_row = ctk.CTkFrame(self.card_exec, fg_color="transparent")
-        filter_row.pack(fill="x", padx=16, pady=(0, 10))
+        filter_row.pack(fill="x", padx=16, pady=(0, 8))
 
         ctk.CTkLabel(
             filter_row,
             text="Filter Cetak:",
+            width=135,
+            anchor="w",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
             text_color=THEME["text_secondary"],
         ).pack(side="left", padx=(0, 8))
@@ -632,12 +702,12 @@ class MainWindow(ctk.CTk):
         self.filter_mode_menu = ctk.CTkOptionMenu(
             filter_row,
             values=FILTER_MODE_OPTIONS,
-            width=200,
+            width=230,
             height=32,
             fg_color=THEME["btn_secondary_bg"],
             button_color=THEME["btn_secondary_hover"],
             button_hover_color=THEME["btn_secondary_hover"],
-            corner_radius=6,
+            corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
             text_color=THEME["text_primary"],
             dropdown_fg_color=THEME["bg_card"],
@@ -657,10 +727,11 @@ class MainWindow(ctk.CTk):
             hover_color=THEME["btn_secondary_hover"],
             border_color=THEME["border_surface"],
             border_width=1,
-            corner_radius=6,
+            corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=12, weight="bold"),
             text_color=THEME["btn_secondary_text"],
             command=self._on_filter_reset,
+            state="disabled",
         )
         self.btn_filter_reset.pack(side="right", padx=(8, 0))
 
@@ -670,7 +741,7 @@ class MainWindow(ctk.CTk):
             fg_color=THEME["bg_surface"],
             border_color=THEME["border_surface"],
             border_width=1,
-            corner_radius=6,
+            corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
             text_color=THEME["text_primary"],
             height=32,
@@ -678,6 +749,13 @@ class MainWindow(ctk.CTk):
         )
         self.filter_query_entry.pack(side="left", fill="x", expand=True)
         self.filter_query_entry.bind("<KeyRelease>", self._on_filter_key_release)
+
+        self.filter_status_banner = FilterStatusBanner(self.card_exec, theme=self.theme)
+        self.filter_status_banner.pack(fill="x", padx=16, pady=(0, 10))
+        self.filter_status_banner.set_status(
+            "all",
+            "STATUS CETAK: Semua Pemilih • Menunggu berkas DPT Excel",
+        )
 
         btn_action_row = ctk.CTkFrame(self.card_exec, fg_color="transparent")
         btn_action_row.pack(fill="x", padx=16, pady=(0, 8))
@@ -824,7 +902,7 @@ class MainWindow(ctk.CTk):
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
             text_color=THEME["text_primary"],
-            wrap="char",
+            wrap="none",
         )
 
         self.log_textbox = ctk.CTkTextbox(
@@ -835,10 +913,11 @@ class MainWindow(ctk.CTk):
             corner_radius=self.theme.corner_radius_inner,
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
             text_color=THEME["text_primary"],
-            wrap="char",
+            wrap="none",
         )
 
         self.voter_table.pack(fill="both", expand=True)
+        self._apply_log_tag_styles()
 
     def _browse_word_file(self) -> None:
         path = filedialog.askopenfilename(
@@ -921,6 +1000,7 @@ class MainWindow(ctk.CTk):
                 state="disabled",
                 placeholder_text="Semua pemilih dalam Kadus terpilih akan dicetak",
             )
+            self.btn_filter_reset.configure(state="disabled")
         else:
             self.filter_query_entry.configure(state="normal")
             if mode == FILTER_MODE_NUMBER:
@@ -929,6 +1009,7 @@ class MainWindow(ctk.CTk):
                 self.filter_query_entry.configure(placeholder_text="Ketik nomor RT, misal: 003 atau 1, 2")
             elif mode == FILTER_MODE_NAME:
                 self.filter_query_entry.configure(placeholder_text="Ketik nama pemilih, misal: Ade Setiawan, Adnan")
+            self.btn_filter_reset.configure(state="normal")
             self.filter_query_entry.focus_set()
 
         self._on_filter_changed()
@@ -940,6 +1021,7 @@ class MainWindow(ctk.CTk):
             state="disabled",
             placeholder_text="Semua pemilih dalam Kadus terpilih akan dicetak",
         )
+        self.btn_filter_reset.configure(state="disabled")
         self._on_filter_changed()
         self.show_toast("Filter pemilih di-reset ke Semua Pemilih", variant="info")
 
@@ -953,11 +1035,15 @@ class MainWindow(ctk.CTk):
 
     def _on_filter_changed(self) -> None:
         if not self.excel_scan_result:
+            if hasattr(self, "filter_status_banner"):
+                self.filter_status_banner.set_status("all", "STATUS CETAK: Semua Pemilih • Menunggu berkas DPT Excel")
             return
 
         filter_mode = self.filter_mode_menu.get().strip()
         filter_query = self.filter_query_entry.get().strip()
-        is_filtered = (filter_mode != FILTER_MODE_ALL and bool(filter_query))
+        is_mode_active = (filter_mode != FILTER_MODE_ALL)
+        is_query_filled = bool(filter_query)
+        is_filtered = (is_mode_active and is_query_filled)
 
         layout = self.word_check_result.layout_mode if self.word_check_result else "2-UP"
 
@@ -965,6 +1051,12 @@ class MainWindow(ctk.CTk):
         total_matched_pages = 0
         active_kadus_count = 0
         preview_voters: list[VoterData] = []
+
+        total_unfiltered = sum(
+            s.total_voters
+            for s in self.excel_scan_result.sheet_summaries
+            if s.is_voter_sheet and (s.sheet_name in self.kadus_rows and self.kadus_rows[s.sheet_name].checkbox_var.get())
+        )
 
         for s in self.excel_scan_result.sheet_summaries:
             if not s.is_voter_sheet:
@@ -1022,6 +1114,33 @@ class MainWindow(ctk.CTk):
                             break
             self.voter_table.set_voters(sample_voters[:5], address_format=curr_addr_mode, is_filtered=False)
 
+        # Update FilterStatusBanner states
+        if hasattr(self, "filter_status_banner"):
+            if not is_mode_active:
+                self.btn_filter_reset.configure(state="disabled")
+                self.filter_status_banner.set_status(
+                    "all",
+                    f"STATUS CETAK: Semua Pemilih • Total {total_matched_all:,} Pemilih ({active_kadus_count} Kadus)".replace(",", "."),
+                )
+            elif not is_query_filled:
+                self.btn_filter_reset.configure(state="normal")
+                self.filter_status_banner.set_status(
+                    "empty",
+                    "FILTER BELUM DIISI: Ketik kriteria filter pada kolom di atas untuk menyaring pemilih",
+                )
+            elif is_filtered and total_matched_all > 0:
+                self.btn_filter_reset.configure(state="normal")
+                self.filter_status_banner.set_status(
+                    "active",
+                    f"FILTER DITERAPKAN: [{filter_mode}: {filter_query}] • Menyaring {total_matched_all:,} dari {total_unfiltered:,} Pemilih ({active_kadus_count} Kadus)".replace(",", "."),
+                )
+            else:
+                self.btn_filter_reset.configure(state="normal")
+                self.filter_status_banner.set_status(
+                    "no_match",
+                    "TIDAK ADA DATA COCOK: 0 pemilih ditemukan untuk filter tersebut. Periksa kembali ketikan Anda",
+                )
+
         if self.is_processing:
             return
 
@@ -1039,7 +1158,7 @@ class MainWindow(ctk.CTk):
             elif total_matched_all > 0:
                 self.btn_start.configure(
                     state="normal",
-                    text=f"Cetak PDF Terfilter ({total_matched_all:,} Pemilih)",
+                    text=f"Cetak PDF Terfilter ({total_matched_all:,} Pemilih)".replace(",", "."),
                     fg_color=THEME["btn_primary_bg"],
                     hover_color=THEME["btn_primary_hover"],
                     text_color=THEME["btn_primary_text"],
@@ -1070,23 +1189,187 @@ class MainWindow(ctk.CTk):
         self.cfg.theme_mode = mode
         save_app_config(self.cfg)
         self._check_ready_state()
+        self._apply_log_tag_styles()
+        if hasattr(self, "filter_status_banner"):
+            self.filter_status_banner.update_theme(self.theme)
+        if hasattr(self, "btn_preview_header"):
+            self.btn_preview_header.configure(
+                fg_color=THEME["btn_accent_soft_bg"],
+                hover_color=THEME["btn_accent_soft_hover"],
+                border_color=THEME["btn_accent_soft_border"],
+                text_color=THEME["btn_accent_soft_text"],
+            )
         self._log(f"[TEMA] Mengganti tema visual ke: {mode}")
+
+    def _apply_log_tag_styles(self) -> None:
+        if not hasattr(self, "log_textbox") or not hasattr(self, "audit_textbox"):
+            return
+        is_dark = (ctk.get_appearance_mode().lower() == "dark")
+        idx = 1 if is_dark else 0
+
+        ts_color = THEME["text_muted"][idx]
+        div_color = THEME["border_card"][idx]
+        msg_color = THEME["text_primary"][idx]
+        msg_dim = THEME["text_secondary"][idx]
+
+        cat_info = THEME["status_info_text"][idx]
+        cat_success = THEME["status_ready_text"][idx]
+        cat_warn = THEME["status_warn_text"][idx]
+        cat_error = THEME["status_error_text"][idx]
+        cat_accent = THEME["btn_accent_soft_text"][idx]
+
+        for tb in (self.log_textbox, self.audit_textbox):
+            raw = tb._textbox
+            raw.tag_config("ts", foreground=ts_color)
+            raw.tag_config("div", foreground=div_color)
+            raw.tag_config("msg", foreground=msg_color)
+            raw.tag_config("msg_dim", foreground=msg_dim)
+
+            raw.tag_config("cat_info", foreground=cat_info)
+            raw.tag_config("cat_success", foreground=cat_success)
+            raw.tag_config("cat_warning", foreground=cat_warn)
+            raw.tag_config("cat_error", foreground=cat_error)
+            raw.tag_config("cat_process", foreground=cat_accent)
+            raw.tag_config("cat_config", foreground=cat_info)
+            raw.tag_config("cat_theme", foreground=cat_accent)
+            raw.tag_config("cat_preview", foreground=cat_accent)
+            raw.tag_config("cat_audit", foreground=cat_info)
+
+            raw.tag_config("table_border", foreground=div_color)
+            raw.tag_config("table_hdr", foreground=cat_accent)
+            raw.tag_config("table_row", foreground=msg_color)
+
+    def _render_single_log_line(self, raw: Any, line: str) -> None:
+        if line.startswith(("┌", "├", "└")):
+            raw.insert("end", line + "\n", "table_border")
+        elif line.startswith("│ No   │"):
+            raw.insert("end", line + "\n", "table_hdr")
+        elif line.startswith("│ ") and line.endswith(" │") and " │ " in line and not line.startswith(("1", "2", "0")):
+            raw.insert("end", line + "\n", "table_row")
+        elif " │ " in line:
+            parts = line.split(" │ ", 2)
+            if len(parts) == 3:
+                ts, cat_pad, msg = parts
+                cat = cat_pad.strip().upper()
+                tag = "cat_info"
+                if cat == "SUKSES": tag = "cat_success"
+                elif cat == "PERINGATAN": tag = "cat_warning"
+                elif cat == "ERROR": tag = "cat_error"
+                elif cat in ("MEMPROSES", "PRATINJAU", "TEMA"): tag = "cat_process"
+
+                raw.insert("end", ts, "ts")
+                raw.insert("end", " │ ", "div")
+                raw.insert("end", f"{cat:<10}", tag)
+                raw.insert("end", " │ ", "div")
+                raw.insert("end", msg + "\n", "msg")
+            else:
+                raw.insert("end", line + "\n", "msg")
+        elif line.startswith("[") and "]" in line:
+            raw.insert("end", line + "\n", "cat_preview")
+        else:
+            raw.insert("end", line + "\n", "msg")
+
+    def _render_history_to_textbox(self, textbox: ctk.CTkTextbox, history: list[str]) -> None:
+        raw = textbox._textbox
+        if not history:
+            placeholder = "Belum ada laporan audit PDF. Jalankan proses mailing terlebih dahulu." if textbox == self.audit_textbox else "Belum ada riwayat log aktivitas."
+            raw.insert("end", placeholder + "\n", "msg_dim")
+            return
+
+        for line in history:
+            self._render_single_log_line(raw, line)
+        textbox.see("end")
 
     def _log(self, text: str, category: str = "all") -> None:
         timestamp = time.strftime("%H:%M:%S")
-        entry = f"[{timestamp}] {text}"
-        self.log_history_all.append(entry)
 
+        is_table_border = text.startswith(("┌", "├", "└"))
+        is_table_hdr = text.startswith("│ No   │")
+        is_table_row = text.startswith("│ ") and text.endswith(" │") and " │ " in text
+
+        cat_name = "INFO"
+        tag_cat = "cat_info"
+        clean_msg = text
+
+        if is_table_border or is_table_hdr or is_table_row:
+            entry = text
+        elif text.startswith("==="):
+            entry = f"[{timestamp}] {text}"
+        else:
+            if text.startswith("[") and "]" in text:
+                bracket_tag = text[1:text.index("]")].strip().upper()
+                clean_msg = text[text.index("]") + 1:].strip()
+                if any(k in bracket_tag for k in ("SELESAI", "SUKSES", "BERHASIL", "READY", "VALID")):
+                    cat_name = "SUKSES"
+                    tag_cat = "cat_success"
+                elif any(k in bracket_tag for k in ("PERINGATAN", "WARN", "PERHATIAN", "ANOMALI")):
+                    cat_name = "PERINGATAN"
+                    tag_cat = "cat_warning"
+                elif any(k in bracket_tag for k in ("ERROR", "GAGAL", "ERR")):
+                    cat_name = "ERROR"
+                    tag_cat = "cat_error"
+                elif "PROSES" in bracket_tag or "CETAK" in bracket_tag:
+                    cat_name = "MEMPROSES"
+                    tag_cat = "cat_process"
+                elif "PENGATURAN" in bracket_tag or "CONFIG" in bracket_tag:
+                    cat_name = "PENGATURAN"
+                    tag_cat = "cat_config"
+                elif "TEMA" in bracket_tag:
+                    cat_name = "TEMA"
+                    tag_cat = "cat_theme"
+                elif "PREVIEW" in bracket_tag:
+                    cat_name = "PRATINJAU"
+                    tag_cat = "cat_preview"
+                elif "AUDIT" in bracket_tag:
+                    cat_name = "AUDIT"
+                    tag_cat = "cat_audit"
+                else:
+                    cat_name = bracket_tag[:10]
+                    tag_cat = "cat_info"
+            elif any(k in text.lower() for k in ("error", "gagal", "terjadi kesalahan")):
+                cat_name = "ERROR"
+                tag_cat = "cat_error"
+            elif any(k in text.lower() for k in ("sukses", "berhasil", "selesai dibuat", "100%")):
+                cat_name = "SUKSES"
+                tag_cat = "cat_success"
+            elif any(k in text.lower() for k in ("perhatian", "peringatan", "anomali")):
+                cat_name = "PERINGATAN"
+                tag_cat = "cat_warning"
+            elif any(k in text.lower() for k in ("memproses", "menggabungkan", "sedang")):
+                cat_name = "MEMPROSES"
+                tag_cat = "cat_process"
+
+            cat_padded = f"{cat_name:<10}"
+            entry = f"{timestamp} │ {cat_padded} │ {clean_msg}"
+
+        self.log_history_all.append(entry)
         if category == "preview":
             self.log_history_preview.append(entry)
         elif category == "audit":
             self.log_history_audit.append(entry)
 
+        def _insert_styled(raw_tb: Any) -> None:
+            if is_table_border:
+                raw_tb.insert("end", text + "\n", "table_border")
+            elif is_table_hdr:
+                raw_tb.insert("end", text + "\n", "table_hdr")
+            elif is_table_row:
+                raw_tb.insert("end", text + "\n", "table_row")
+            elif text.startswith("==="):
+                raw_tb.insert("end", f"[{timestamp}] ", "ts")
+                raw_tb.insert("end", text + "\n", "cat_preview")
+            else:
+                raw_tb.insert("end", timestamp, "ts")
+                raw_tb.insert("end", " │ ", "div")
+                raw_tb.insert("end", f"{cat_name:<10}", tag_cat)
+                raw_tb.insert("end", " │ ", "div")
+                raw_tb.insert("end", clean_msg + "\n", "msg")
+
         if self.current_log_tab == "all":
-            self.log_textbox.insert("end", entry + "\n")
+            _insert_styled(self.log_textbox._textbox)
             self.log_textbox.see("end")
         elif self.current_log_tab == "audit" and category == "audit":
-            self.audit_textbox.insert("end", entry + "\n")
+            _insert_styled(self.audit_textbox._textbox)
             self.audit_textbox.see("end")
 
     def _clear_logs(self) -> None:
@@ -1109,16 +1392,12 @@ class MainWindow(ctk.CTk):
             self.current_log_tab = "audit"
             self.audit_textbox.pack(fill="both", expand=True)
             self.audit_textbox.delete("1.0", "end")
-            content = "\n".join(self.log_history_audit) or "Belum ada laporan audit PDF. Jalankan proses mailing terlebih dahulu."
-            self.audit_textbox.insert("end", content + "\n")
-            self.audit_textbox.see("end")
+            self._render_history_to_textbox(self.audit_textbox, self.log_history_audit)
         else:
             self.current_log_tab = "all"
             self.log_textbox.pack(fill="both", expand=True)
             self.log_textbox.delete("1.0", "end")
-            content = "\n".join(self.log_history_all) or "Belum ada riwayat log aktivitas."
-            self.log_textbox.insert("end", content + "\n")
-            self.log_textbox.see("end")
+            self._render_history_to_textbox(self.log_textbox, self.log_history_all)
 
     def _run_word_check(self) -> None:
         if self.is_processing:
@@ -1165,7 +1444,7 @@ class MainWindow(ctk.CTk):
             self.word_ready = True
             status_txt = res.format_status_text if res.format_status_text else f"• Mode {mode_desc} Siap Mailing"
             self.doc_row_word.set_status(status_txt, "ready")
-            self._log(f"[WORD SIAP] {res.status_badge}: {res.prepared_docx_path}")
+            self._log(f"[WORD SIAP] {res.status_badge}: {shorten_path(res.prepared_docx_path)}")
         else:
             self.word_ready = False
             self.doc_row_word.set_status(f"Perlu Perbaikan: {res.message}", "error")
@@ -1308,8 +1587,8 @@ class MainWindow(ctk.CTk):
 
         if res.preview_samples:
             self._log("=== PRATINJAU DATA PEMILIH (5 BARIS PERTAMA) ===", category="preview")
-            for sample in res.preview_samples:
-                self._log(sample, category="preview")
+            for table_line in format_voter_preview_table(res.preview_samples[:5]):
+                self._log(table_line, category="preview")
 
         self._update_selected_metrics()
         self._check_ready_state()
@@ -1429,7 +1708,7 @@ class MainWindow(ctk.CTk):
         )
 
         if ok:
-            self._log(f"[PREVIEW SELESAI] Pratinjau tersimpan di: {final_pdf}")
+            self._log(f"[PREVIEW SELESAI] Pratinjau tersimpan di: {shorten_path(final_pdf)}")
             try:
                 os.startfile(final_pdf)
             except Exception:
@@ -1700,7 +1979,7 @@ class MainWindow(ctk.CTk):
                     )
 
                 elif msg_type == "verify_started":
-                    self._log(f"[AUDIT] Memverifikasi integritas PDF: {payload}...")
+                    self._log(f"[AUDIT] Memverifikasi integritas PDF: {shorten_path(payload)}...")
 
                 elif msg_type == "verify_done":
                     ver, out_pdf = payload
@@ -1712,7 +1991,7 @@ class MainWindow(ctk.CTk):
                     self._log(ver.audit_summary, category="audit")
 
                 elif msg_type == "audit_exported":
-                    self._log(f"[AUDIT SELESAI] Laporan audit tersimpan di: {payload}", category="audit")
+                    self._log(f"[AUDIT SELESAI] Laporan audit tersimpan di: {shorten_path(payload)}", category="audit")
 
                 elif msg_type == "process_cancelled":
                     elapsed = time.monotonic() - self.start_process_time if self.start_process_time > 0 else 0.0
