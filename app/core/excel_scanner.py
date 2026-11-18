@@ -21,7 +21,14 @@ from app.config.settings import (
     ADDRESS_FORMAT_SHORT,
     DEFAULT_ADDRESS_FORMAT,
     PATENTED_VILLAGE_NAME,
+    FILTER_MODE_ALL,
+    FILTER_MODE_NUMBER,
+    FILTER_MODE_RT,
+    FILTER_MODE_NAME,
+    FILTER_MODE_OPTIONS,
+    DEFAULT_FILTER_MODE,
 )
+from app.core.security import sanitize_filename
 
 @dataclass
 class ExcelSnapshot:
@@ -301,6 +308,164 @@ def transform_address(
         "sheet_name": sheet_name,
     }
     return build_voter_address(raw_dict, address_format=mode)
+
+def normalize_rt_token(val: Any) -> str:
+    raw = str(val or "").strip()
+    cleaned = re.sub(r"^(?:rt\.?|r\.t\.?)\s*", "", raw, flags=re.IGNORECASE).strip()
+    if cleaned.isdigit():
+        return str(int(cleaned))
+    return cleaned.lstrip("0") or "0" if cleaned else ""
+
+def parse_number_filter_query(query: str) -> set[int]:
+    result: set[int] = set()
+    tokens = re.split(r"[,;]+", str(query or ""))
+    for token in tokens:
+        tok = token.strip()
+        if not tok:
+            continue
+        range_match = re.search(r"(\d+)\s*[-–—]\s*(\d+)", tok)
+        if range_match:
+            start = int(range_match.group(1))
+            end = int(range_match.group(2))
+            if start > end:
+                start, end = end, start
+            # Guard against excessive memory allocation from user input
+            if end - start > 10000:
+                end = start + 10000
+            result.update(range(start, end + 1))
+        else:
+            for num in re.findall(r"\d+", tok):
+                result.add(int(num))
+    return result
+
+def parse_rt_filter_query(query: str) -> set[str]:
+    result: set[str] = set()
+    tokens = re.split(r"[,;/]+", str(query or ""))
+    for token in tokens:
+        tok = token.strip()
+        if not tok:
+            continue
+        parts = tok.split() if not re.match(r"^(?:rt\.?|r\.t\.?)\s*\d+$", tok, re.IGNORECASE) else [tok]
+        for p in parts:
+            norm = normalize_rt_token(p)
+            if norm:
+                result.add(norm)
+    return result
+
+def parse_name_filter_query(query: str) -> list[str]:
+    tokens = re.split(r"[,;]+", str(query or ""))
+    cleaned: list[str] = []
+    for t in tokens:
+        item = t.strip().lower()
+        if item:
+            cleaned.append(item)
+    return cleaned
+
+def get_voter_normalized_rt(voter: Any) -> str:
+    rt_raw = ""
+    if hasattr(voter, "rt_raw") and voter.rt_raw:
+        rt_raw = voter.rt_raw
+    elif hasattr(voter, "rt_formatted") and voter.rt_formatted:
+        rt_raw = voter.rt_formatted
+    elif isinstance(voter, dict):
+        rt_raw = voter.get("rt_raw") or voter.get("rt_formatted") or voter.get("rt") or ""
+
+    if hasattr(voter, "extra_fields") and not rt_raw:
+        rt_raw = voter.extra_fields.get("rt", "")
+    elif isinstance(voter, dict) and not rt_raw:
+        extra = voter.get("extra_fields", {}) or {}
+        rt_raw = extra.get("rt", "")
+
+    if not rt_raw:
+        alamat = getattr(voter, "alamat", "") if hasattr(voter, "alamat") else voter.get("alamat", "")
+        alamat_raw = getattr(voter, "alamat_raw", "") if hasattr(voter, "alamat_raw") else voter.get("alamat_raw", "")
+        m = re.search(r"\bRT\.?\s*(\d+)", f"{alamat} {alamat_raw}", re.IGNORECASE)
+        if m:
+            rt_raw = m.group(1)
+
+    return normalize_rt_token(rt_raw)
+
+def apply_voter_filter(
+    voters: list[Any],
+    filter_mode: str = FILTER_MODE_ALL,
+    filter_query: str = "",
+) -> list[Any]:
+    query_str = str(filter_query or "").strip()
+    if filter_mode == FILTER_MODE_ALL or not query_str:
+        return list(voters)
+
+    if filter_mode == FILTER_MODE_NUMBER:
+        target_numbers = parse_number_filter_query(query_str)
+        if not target_numbers:
+            return []
+        matched: list[Any] = []
+        for v in voters:
+            nomor_val = getattr(v, "nomor", None) if hasattr(v, "nomor") else v.get("nomor", "")
+            m = re.search(r"\d+", str(nomor_val or ""))
+            if m and int(m.group()) in target_numbers:
+                matched.append(v)
+        return matched
+
+    if filter_mode == FILTER_MODE_RT:
+        target_rts = parse_rt_filter_query(query_str)
+        if not target_rts:
+            return []
+        matched = []
+        for v in voters:
+            v_rt = get_voter_normalized_rt(v)
+            if v_rt and v_rt in target_rts:
+                matched.append(v)
+        return matched
+
+    if filter_mode == FILTER_MODE_NAME:
+        keywords = parse_name_filter_query(query_str)
+        if not keywords:
+            return []
+        matched = []
+        for v in voters:
+            name_val = getattr(v, "nama", None) if hasattr(v, "nama") else v.get("nama", "")
+            name_lower = str(name_val or "").lower()
+            if any(kw in name_lower for kw in keywords):
+                matched.append(v)
+        return matched
+
+    return list(voters)
+
+def build_filter_filename_suffix(filter_mode: str, filter_query: str) -> str:
+    query_str = str(filter_query or "").strip()
+    if filter_mode == FILTER_MODE_ALL or not query_str:
+        return ""
+
+    if filter_mode == FILTER_MODE_NUMBER:
+        cleaned = re.sub(r"[^\d\-]+", "_", query_str).strip("_")
+        cleaned = re.sub(r"_+", "_", cleaned)
+        if len(cleaned) > 15:
+            cleaned = cleaned[:15].rstrip("_-")
+        suffix = f"_CETAK_NO_{cleaned}" if cleaned else "_CETAK_NO"
+    elif filter_mode == FILTER_MODE_RT:
+        cleaned = re.sub(r"[^\w]+", "_", query_str).strip("_")
+        cleaned = re.sub(r"_+", "_", cleaned)
+        if len(cleaned) > 15:
+            cleaned = cleaned[:15].rstrip("_")
+        suffix = f"_RT_{cleaned}" if cleaned else "_RT"
+    elif filter_mode == FILTER_MODE_NAME:
+        cleaned = re.sub(r"[^\w]+", "_", query_str).strip("_")
+        cleaned = re.sub(r"_+", "_", cleaned)
+        if len(cleaned) > 12:
+            cleaned = cleaned[:12].rstrip("_")
+        suffix = f"_FILTER_NAMA_{cleaned.upper()}" if cleaned else "_FILTER_NAMA"
+    else:
+        suffix = ""
+
+    if not suffix:
+        return ""
+
+    safe_suffix = sanitize_filename(suffix)
+    if len(safe_suffix) > 25:
+        safe_suffix = safe_suffix[:25].rstrip("_-")
+    if not safe_suffix.startswith("_"):
+        safe_suffix = f"_{safe_suffix}"
+    return safe_suffix
 
 SYNONYMS: dict[str, list[str]] = {
     "no": ["no", "nomor", "no.", "no urut", "nomor urut", "id", "num"],

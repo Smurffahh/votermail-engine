@@ -25,6 +25,12 @@ from app.config.settings import (
     TEMP_DIR,
     ADDRESS_FORMAT_OPTIONS,
     DEFAULT_ADDRESS_FORMAT,
+    FILTER_MODE_ALL,
+    FILTER_MODE_NUMBER,
+    FILTER_MODE_RT,
+    FILTER_MODE_NAME,
+    FILTER_MODE_OPTIONS,
+    DEFAULT_FILTER_MODE,
 )
 from app.config.theme import DARK_THEME, LIGHT_THEME, ThemeTokens, get_theme, THEME
 from app.config.version import (
@@ -43,6 +49,8 @@ from app.core.excel_scanner import (
     compute_excel_snapshot,
     analyze_excel_diff,
     get_excel_file_fingerprint,
+    apply_voter_filter,
+    build_filter_filename_suffix,
 )
 from app.core.mail_merger import (
     generate_preview_via_word,
@@ -561,6 +569,66 @@ class MainWindow(ctk.CTk):
             self.verify_switch.deselect()
         self.verify_switch.pack(side="right")
 
+        filter_row = ctk.CTkFrame(self.card_exec, fg_color="transparent")
+        filter_row.pack(fill="x", padx=16, pady=(0, 10))
+
+        ctk.CTkLabel(
+            filter_row,
+            text="Filter Cetak:",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            text_color=THEME["text_secondary"],
+        ).pack(side="left", padx=(0, 8))
+
+        self.filter_mode_menu = ctk.CTkOptionMenu(
+            filter_row,
+            values=FILTER_MODE_OPTIONS,
+            width=200,
+            height=32,
+            fg_color=THEME["btn_secondary_bg"],
+            button_color=THEME["btn_secondary_hover"],
+            button_hover_color=THEME["btn_secondary_hover"],
+            corner_radius=6,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            text_color=THEME["text_primary"],
+            dropdown_fg_color=THEME["bg_card"],
+            dropdown_text_color=THEME["text_primary"],
+            dropdown_hover_color=THEME["bg_hover"],
+            command=self._on_filter_mode_changed,
+        )
+        self.filter_mode_menu.set(DEFAULT_FILTER_MODE)
+        self.filter_mode_menu.pack(side="left", padx=(0, 8))
+
+        self.btn_filter_reset = ctk.CTkButton(
+            filter_row,
+            text="✕",
+            width=32,
+            height=32,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_color=THEME["border_surface"],
+            border_width=1,
+            corner_radius=6,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=12, weight="bold"),
+            text_color=THEME["btn_secondary_text"],
+            command=self._on_filter_reset,
+        )
+        self.btn_filter_reset.pack(side="right", padx=(8, 0))
+
+        self.filter_query_entry = ctk.CTkEntry(
+            filter_row,
+            placeholder_text="Semua pemilih dalam Kadus terpilih akan dicetak",
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
+            border_width=1,
+            corner_radius=6,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            text_color=THEME["text_primary"],
+            height=32,
+            state="disabled",
+        )
+        self.filter_query_entry.pack(side="left", fill="x", expand=True)
+        self.filter_query_entry.bind("<KeyRelease>", self._on_filter_key_release)
+
         btn_action_row = ctk.CTkFrame(self.card_exec, fg_color="transparent")
         btn_action_row.pack(fill="x", padx=16, pady=(0, 8))
 
@@ -780,7 +848,156 @@ class MainWindow(ctk.CTk):
         self.cfg.address_mode = val
         self._save_active_config()
         self.voter_table.update_address_format(val)
+        self._on_filter_changed()
         self._log(f"[PENGATURAN] Format alamat diubah: {val}")
+
+    def _on_filter_mode_changed(self, mode: str) -> None:
+        if mode == FILTER_MODE_ALL:
+            self.filter_query_entry.delete(0, "end")
+            self.filter_query_entry.configure(
+                state="disabled",
+                placeholder_text="Semua pemilih dalam Kadus terpilih akan dicetak",
+            )
+        else:
+            self.filter_query_entry.configure(state="normal")
+            if mode == FILTER_MODE_NUMBER:
+                self.filter_query_entry.configure(placeholder_text="Ketik nomor/rentang, misal: 15, 42, 100-115")
+            elif mode == FILTER_MODE_RT:
+                self.filter_query_entry.configure(placeholder_text="Ketik nomor RT, misal: 003 atau 1, 2")
+            elif mode == FILTER_MODE_NAME:
+                self.filter_query_entry.configure(placeholder_text="Ketik nama pemilih, misal: Ade Setiawan, Adnan")
+            self.filter_query_entry.focus_set()
+
+        self._on_filter_changed()
+
+    def _on_filter_reset(self) -> None:
+        self.filter_mode_menu.set(FILTER_MODE_ALL)
+        self.filter_query_entry.delete(0, "end")
+        self.filter_query_entry.configure(
+            state="disabled",
+            placeholder_text="Semua pemilih dalam Kadus terpilih akan dicetak",
+        )
+        self._on_filter_changed()
+
+    def _on_filter_key_release(self, event: Any = None) -> None:
+        if hasattr(self, "_filter_debounce_id") and self._filter_debounce_id:
+            try:
+                self.after_cancel(self._filter_debounce_id)
+            except Exception:
+                pass
+        self._filter_debounce_id = self.after(150, self._on_filter_changed)
+
+    def _on_filter_changed(self) -> None:
+        if not self.excel_scan_result:
+            return
+
+        filter_mode = self.filter_mode_menu.get().strip()
+        filter_query = self.filter_query_entry.get().strip()
+        is_filtered = (filter_mode != FILTER_MODE_ALL and bool(filter_query))
+
+        layout = self.word_check_result.layout_mode if self.word_check_result else "2-UP"
+
+        total_matched_all = 0
+        total_matched_pages = 0
+        active_kadus_count = 0
+        preview_voters: list[VoterData] = []
+
+        for s in self.excel_scan_result.sheet_summaries:
+            if not s.is_voter_sheet:
+                continue
+
+            if is_filtered:
+                matched_sheet_voters = apply_voter_filter(s.voters, filter_mode, filter_query)
+            else:
+                matched_sheet_voters = s.voters
+
+            m_cnt = len(matched_sheet_voters)
+            m_pages = m_cnt if layout == "1-UP" else math.ceil(m_cnt / 2)
+
+            if s.sheet_name in self.kadus_rows:
+                self.kadus_rows[s.sheet_name].update_filter_stats(m_cnt, m_pages, is_filtered)
+
+            is_checked = (s.sheet_name in self.kadus_rows and self.kadus_rows[s.sheet_name].checkbox_var.get())
+            if is_checked:
+                if is_filtered:
+                    total_matched_all += m_cnt
+                    total_matched_pages += m_pages
+                    if m_cnt > 0:
+                        active_kadus_count += 1
+                    if len(preview_voters) < 25:
+                        preview_voters.extend(matched_sheet_voters[:25 - len(preview_voters)])
+                else:
+                    total_matched_all += s.total_voters
+                    total_matched_pages += (s.total_voters if layout == "1-UP" else s.expected_pages)
+                    active_kadus_count += 1
+
+        selected_total_checked = sum(1 for row in self.kadus_rows.values() if row.checkbox_var.get())
+
+        self.metric_bar.update_metrics(active_kadus_count, total_matched_all, total_matched_pages)
+
+        curr_addr_mode = self.address_mode_menu.get().strip()
+        if is_filtered:
+            self.voter_table.set_voters(
+                preview_voters,
+                address_format=curr_addr_mode,
+                is_filtered=True,
+                empty_message="Tidak ada pemilih yang cocok dengan filter tersebut. Periksa kembali nomor/RT/nama yang diketik.",
+            )
+        else:
+            sample_voters: list[VoterData] = []
+            for s in self.excel_scan_result.sheet_summaries:
+                if s.voters and (s.sheet_name in self.kadus_rows and self.kadus_rows[s.sheet_name].checkbox_var.get()):
+                    sample_voters.extend(s.voters)
+                    if len(sample_voters) >= 5:
+                        break
+            if not sample_voters:
+                for s in self.excel_scan_result.sheet_summaries:
+                    if s.voters:
+                        sample_voters.extend(s.voters)
+                        if len(sample_voters) >= 5:
+                            break
+            self.voter_table.set_voters(sample_voters[:5], address_format=curr_addr_mode, is_filtered=False)
+
+        if self.is_processing:
+            return
+
+        if is_filtered:
+            if selected_total_checked == 0:
+                self.btn_start.configure(
+                    state="disabled",
+                    text="Pilih Minimal 1 Wilayah Kadus",
+                    fg_color=THEME["btn_disabled_bg"],
+                    text_color=THEME["btn_disabled_text"],
+                )
+                self.status_detail_label.configure(
+                    text="Pilih minimal 1 wilayah Kadus yang ingin dicetak."
+                )
+            elif total_matched_all > 0:
+                self.btn_start.configure(
+                    state="normal",
+                    text=f"Cetak PDF Terfilter ({total_matched_all:,} Pemilih)",
+                    fg_color=THEME["btn_primary_bg"],
+                    hover_color=THEME["btn_primary_hover"],
+                    text_color=THEME["btn_primary_text"],
+                )
+                self.status_detail_label.configure(
+                    text=f"Filter Aktif: {total_matched_all:,} Pemilih Cocok ({active_kadus_count} Kadus)".replace(",", ".")
+                )
+            else:
+                self.btn_start.configure(
+                    state="disabled",
+                    text="Tidak Ada Pemilih Cocok",
+                    fg_color=THEME["btn_disabled_bg"],
+                    text_color=THEME["btn_disabled_text"],
+                )
+                self.status_detail_label.configure(
+                    text="Tidak ada pemilih yang cocok dengan filter tersebut. Periksa kembali nomor/RT/nama yang diketik."
+                )
+        else:
+            self._check_ready_state()
+            self.status_detail_label.configure(
+                text=f"Siap Memproses: 0 / {total_matched_all:,} Pemilih ({active_kadus_count} Kadus)".replace(",", ".")
+            )
 
     def _on_theme_toggled(self, val: str) -> None:
         mode = "Dark" if "gelap" in val.lower() or val.lower() == "dark" else "Light"
@@ -1070,24 +1287,7 @@ class MainWindow(ctk.CTk):
     def _update_selected_metrics(self) -> None:
         if not self.excel_scan_result:
             return
-
-        selected_sheets = [
-            s for s in self.excel_scan_result.sheet_summaries
-            if s.sheet_name in self.kadus_rows and self.kadus_rows[s.sheet_name].checkbox_var.get()
-        ]
-
-        layout = self.word_check_result.layout_mode if self.word_check_result else "2-UP"
-        kadus_count = len(selected_sheets)
-        total_voters = sum(s.total_voters for s in selected_sheets)
-        total_pages = total_voters if layout == "1-UP" else sum(s.expected_pages for s in selected_sheets)
-
-        self.metric_bar.update_metrics(kadus_count, total_voters, total_pages)
-
-        self.status_detail_label.configure(
-            text=f"Siap Memproses: 0 / {total_voters:,} Pemilih ({kadus_count} Kadus)".replace(",", ".")
-        )
-
-        self._check_ready_state()
+        self._on_filter_changed()
 
     def _check_ready_state(self) -> None:
         selected_count = sum(1 for row in self.kadus_rows.values() if row.checkbox_var.get())
@@ -1184,6 +1384,28 @@ class MainWindow(ctk.CTk):
             )
             return
 
+        filter_mode = self.filter_mode_menu.get().strip()
+        filter_query = self.filter_query_entry.get().strip()
+        is_filtered = (filter_mode != FILTER_MODE_ALL and bool(filter_query))
+
+        sheets_data: list[tuple[SheetScanSummary, list[VoterData]]] = []
+        for s in selected_sheets:
+            if is_filtered:
+                matched_v = apply_voter_filter(s.voters, filter_mode, filter_query)
+                if not matched_v:
+                    self._log(f"[INFO] {s.sheet_name} dilewati karena tidak ada pemilih yang cocok dengan filter.")
+                    continue
+                sheets_data.append((s, matched_v))
+            else:
+                sheets_data.append((s, s.voters))
+
+        if not sheets_data:
+            messagebox.showwarning(
+                "Tidak Ada Pemilih Cocok",
+                "Tidak ada pemilih yang cocok dengan filter yang ditentukan pada Kadus terpilih.",
+            )
+            return
+
         output_dir = self.output_entry.get().strip() or str(OUTPUT_DIR.resolve())
         os.makedirs(output_dir, exist_ok=True)
 
@@ -1211,25 +1433,27 @@ class MainWindow(ctk.CTk):
         self.badge_mailing.set_status("Memproses...", "process")
         self.progress_bar.set(0.0)
 
-        total_voters_all = sum(s.total_voters for s in selected_sheets)
+        total_voters_all = sum(len(v_list) for _, v_list in sheets_data)
         template_doc = self.word_check_result.prepared_docx_path
         verify_pdf_on = self.verify_switch.get() == 1
         layout_mode = self.word_check_result.layout_mode if self.word_check_result else "2-UP"
         active_address_format = self.address_mode_menu.get().strip()
+        filter_suffix = build_filter_filename_suffix(filter_mode, filter_query) if is_filtered else ""
 
-        self._log(f"[MAILING MULAI] Memulai proses mailing {len(selected_sheets)} Kadus ({total_voters_all:,} pemilih, Mode: {layout_mode})...")
+        filter_info = f" | Filter: {filter_mode} ({filter_query})" if is_filtered else ""
+        self._log(f"[MAILING MULAI] Memulai proses mailing {len(sheets_data)} Kadus ({total_voters_all:,} pemilih, Mode: {layout_mode}{filter_info})...")
 
         def worker() -> None:
             processed_voters_acc = 0
             audit_results: list[VerificationResult] = []
 
-            for s in selected_sheets:
+            for s, voters_list in sheets_data:
                 if self.cancel_event.is_set():
                     self.worker_queue.put(("process_cancelled", "Dibatalkan oleh pengguna."))
                     return
 
                 self.worker_queue.put(("kadus_started", s.sheet_name))
-                safe_name = sanitize_filename(f"SURAT_PEMBERITAHUAN_{s.sheet_name}")
+                safe_name = sanitize_filename(f"SURAT_PEMBERITAHUAN_{s.sheet_name}{filter_suffix}")
                 out_pdf = os.path.join(output_dir, f"{safe_name}.pdf")
 
                 def prog_cb(cur: int, tot: int, sheet: str) -> None:
@@ -1241,7 +1465,7 @@ class MainWindow(ctk.CTk):
 
                 ok, pages, msg = merge_voters_to_pdf_via_word_com(
                     template_docx_path=template_doc,
-                    voters=s.voters,
+                    voters=voters_list,
                     sheet_name=s.sheet_name,
                     wilayah_name=s.wilayah_text,
                     output_pdf_path=out_pdf,
@@ -1256,11 +1480,11 @@ class MainWindow(ctk.CTk):
                     self.worker_queue.put(("kadus_failed", (s.sheet_name, msg)))
                     return
 
-                processed_voters_acc += s.total_voters
+                processed_voters_acc += len(voters_list)
 
                 if verify_pdf_on and not self.cancel_event.is_set():
                     self.worker_queue.put(("verify_started", s.sheet_name))
-                    ver = verify_kadus_pdf(out_pdf, s.sheet_name, s.voters, layout_mode=layout_mode)
+                    ver = verify_kadus_pdf(out_pdf, s.sheet_name, voters_list, layout_mode=layout_mode)
                     audit_results.append(ver)
                     self.worker_queue.put(("verify_done", (ver, out_pdf)))
                 else:
@@ -1270,7 +1494,7 @@ class MainWindow(ctk.CTk):
                 audit_file = export_audit_excel(audit_results, output_dir)
                 self.worker_queue.put(("audit_exported", audit_file))
 
-            self.worker_queue.put(("all_completed", (len(selected_sheets), total_voters_all)))
+            self.worker_queue.put(("all_completed", (len(sheets_data), total_voters_all)))
 
         threading.Thread(target=worker, daemon=True).start()
 

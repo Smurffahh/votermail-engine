@@ -434,6 +434,20 @@ class KadusRowItem(ctk.CTkFrame):
     def set_enabled(self, enabled: bool) -> None:
         self.checkbox.configure(state="normal" if enabled else "disabled")
 
+    def update_filter_stats(self, matched_count: int, matched_pages: int, is_filter_active: bool) -> None:
+        if not is_filter_active:
+            self.info_label.configure(text=f"{self.voter_count:,} Pemilih  •  {self.page_count:,} Lembar")
+            self.status_label.configure(text="• Siap", text_color=THEME["status_ready_text"])
+            self.checkbox.configure(state="normal")
+        else:
+            if matched_count > 0:
+                self.info_label.configure(text=f"{matched_count:,} / {self.voter_count:,} Pemilih  •  {matched_pages:,} Lembar")
+                self.status_label.configure(text=f"• {matched_count:,} Cocok", text_color=THEME["status_ready_text"])
+                self.checkbox.configure(state="normal")
+            else:
+                self.info_label.configure(text=f"0 / {self.voter_count:,} Pemilih  •  0 Lembar")
+                self.status_label.configure(text="• Dilewati", text_color=THEME["text_muted"])
+
     def update_theme(self, theme: ThemeTokens) -> None:
         pass
 
@@ -489,7 +503,7 @@ class VoterPreviewTable(ctk.CTkFrame):
         self.divider.pack(fill="x", padx=6, pady=2)
 
         # Rows Container
-        self.rows_container = ctk.CTkFrame(self, fg_color="transparent")
+        self.rows_container = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.rows_container.pack(fill="both", expand=True, padx=6, pady=(2, 8))
 
         self.empty_label = ctk.CTkLabel(
@@ -500,8 +514,16 @@ class VoterPreviewTable(ctk.CTkFrame):
         )
         self.empty_label.pack(pady=24)
 
-    def set_voters(self, voters: list[VoterData], address_format: str | None = None) -> None:
+    def set_voters(
+        self,
+        voters: list[VoterData],
+        address_format: str | None = None,
+        is_filtered: bool = False,
+        empty_message: str | None = None,
+    ) -> None:
         self.cached_voters = list(voters)
+        self.is_filtered = is_filtered
+        self.custom_empty_message = empty_message
         if address_format:
             self.cached_address_format = address_format
         self._render_rows()
@@ -515,16 +537,22 @@ class VoterPreviewTable(ctk.CTkFrame):
             child.destroy()
 
         if not self.cached_voters:
+            msg = getattr(self, "custom_empty_message", None) or (
+                "Tidak ada pemilih yang cocok dengan filter. Periksa kembali nomor, RT, atau nama yang diketik."
+                if getattr(self, "is_filtered", False)
+                else "Belum ada data pemilih. Pilih dan scan berkas Excel DPT di kartu 1 untuk melihat pratinjau 5 pemilih pertama."
+            )
             self.empty_label = ctk.CTkLabel(
                 self.rows_container,
-                text="Belum ada data pemilih. Pilih dan scan berkas Excel DPT di kartu 1 untuk melihat pratinjau 5 pemilih pertama.",
+                text=msg,
                 font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
                 text_color=THEME["text_muted"],
             )
             self.empty_label.pack(pady=24)
             return
 
-        for voter in self.cached_voters[:5]:
+        limit = 25 if getattr(self, "is_filtered", False) else 5
+        for voter in self.cached_voters[:limit]:
             row = ctk.CTkFrame(self.rows_container, fg_color="transparent", height=24)
             row.pack(fill="x", padx=4, pady=2)
 

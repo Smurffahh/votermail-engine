@@ -93,6 +93,12 @@ FEATURE_REGISTRY: list[dict[str, str]] = [
         "title": "Stopwatch Waktu Berjalan Real-Time pada Progress Bar",
         "description": "Penggantian indikator Estimasi Sisa menjadi penghitung Waktu Berjalan (Live Stopwatch) real-time yang terus berdetak hingga seluruh proses PDF selesai.",
     },
+    {
+        "version": "1.9.0",
+        "date": "2026-11-18",
+        "title": "Cetak Ulang Selektif (Filter Nomor Urut, RT, & Nama Pemilih)",
+        "description": "Penambahan fitur Cetak Ulang Selektif (Filter Nomor Urut DPT, Filter per RT, dan Pencarian Nama Pemilih) dengan sinkronisasi pratinjau real-time dan penamaan PDF aman.",
+    },
 ]
 
 def get_current_version() -> str:

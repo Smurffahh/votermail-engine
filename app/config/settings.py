@@ -55,6 +55,19 @@ ADDRESS_FORMAT_OPTIONS = [
 DEFAULT_ADDRESS_FORMAT = ADDRESS_FORMAT_FULL
 PATENTED_VILLAGE_NAME = "Desa Karangjengkol"
 
+FILTER_MODE_ALL = "Semua Pemilih (Standar)"
+FILTER_MODE_NUMBER = "Nomor Urut Tertentu"
+FILTER_MODE_RT = "Khusus RT Tertentu"
+FILTER_MODE_NAME = "Cari Nama Pemilih"
+
+FILTER_MODE_OPTIONS = [
+    FILTER_MODE_ALL,
+    FILTER_MODE_NUMBER,
+    FILTER_MODE_RT,
+    FILTER_MODE_NAME,
+]
+DEFAULT_FILTER_MODE = FILTER_MODE_ALL
+
 def get_default_excel_path() -> str:
     real_excel = TEMPLATES_DIR / "DAFTAR PEMILIH TETAP DESA KARANGJENGKOL.xlsx"
     if real_excel.exists():

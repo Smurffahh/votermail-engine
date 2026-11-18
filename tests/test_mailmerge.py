@@ -927,5 +927,110 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(format_elapsed_time(7325), "02:02:05")
         self.assertEqual(format_elapsed_time(-10), "00:00")
 
+    def test_27_selective_reprint_filter_parsers_and_functions(self) -> None:
+        from app.config.settings import (
+            FILTER_MODE_ALL,
+            FILTER_MODE_NUMBER,
+            FILTER_MODE_RT,
+            FILTER_MODE_NAME,
+            FILTER_MODE_OPTIONS,
+            DEFAULT_FILTER_MODE,
+        )
+        from app.core.excel_scanner import (
+            parse_number_filter_query,
+            parse_rt_filter_query,
+            parse_name_filter_query,
+            apply_voter_filter,
+            build_filter_filename_suffix,
+            VoterData,
+        )
+
+        self.assertEqual(DEFAULT_FILTER_MODE, FILTER_MODE_ALL)
+        self.assertIn(FILTER_MODE_NUMBER, FILTER_MODE_OPTIONS)
+        self.assertIn(FILTER_MODE_RT, FILTER_MODE_OPTIONS)
+        self.assertIn(FILTER_MODE_NAME, FILTER_MODE_OPTIONS)
+
+        # 1. Test parse_number_filter_query
+        self.assertEqual(
+            parse_number_filter_query("15, 42, 100-105"),
+            {15, 42, 100, 101, 102, 103, 104, 105},
+        )
+        self.assertEqual(parse_number_filter_query("No. 1, 3-4"), {1, 3, 4})
+        self.assertEqual(parse_number_filter_query("100 - 102; 200"), {100, 101, 102, 200})
+        self.assertEqual(parse_number_filter_query("105-100"), {100, 101, 102, 103, 104, 105})
+        self.assertEqual(len(parse_number_filter_query("1-50000")), 10001)
+        self.assertEqual(parse_number_filter_query(""), set())
+
+        # 2. Test parse_rt_filter_query
+        self.assertEqual(parse_rt_filter_query("3"), {"3"})
+        self.assertEqual(parse_rt_filter_query("03"), {"3"})
+        self.assertEqual(parse_rt_filter_query("003"), {"3"})
+        self.assertEqual(parse_rt_filter_query("RT 003"), {"3"})
+        self.assertEqual(parse_rt_filter_query("1, 2, RT 003"), {"1", "2", "3"})
+        self.assertEqual(parse_rt_filter_query(""), set())
+
+        # 3. Test parse_name_filter_query
+        self.assertEqual(
+            parse_name_filter_query("ADE SETIAWAN, ADNAN"),
+            ["ade setiawan", "adnan"],
+        )
+        self.assertEqual(parse_name_filter_query("Budi"), ["budi"])
+        self.assertEqual(parse_name_filter_query(""), [])
+
+        # 4. Test apply_voter_filter
+        v1 = VoterData(
+            nomor="1",
+            nama="Budi Santoso",
+            jenis_kelamin="Laki-laki",
+            umur="25 Tahun",
+            alamat="KARANGJENGKOL, RT 001 / RW 001",
+            sheet_name="KADUS 1",
+            wilayah="KADUS 1",
+            row_index=5,
+            rt_formatted="001",
+        )
+        v2 = VoterData(
+            nomor="3",
+            nama="Ade Setiawan",
+            jenis_kelamin="Laki-laki",
+            umur="30 Tahun",
+            alamat="KARANGJENGKOL, RT 003 / RW 001",
+            sheet_name="KADUS 1",
+            wilayah="KADUS 1",
+            row_index=6,
+            rt_formatted="003",
+        )
+        v3 = VoterData(
+            nomor="4",
+            nama="Siti Adnan",
+            jenis_kelamin="Perempuan",
+            umur="28 Tahun",
+            alamat="KARANGJENGKOL, RT 003 / RW 001",
+            sheet_name="KADUS 1",
+            wilayah="KADUS 1",
+            row_index=7,
+            rt_formatted="003",
+        )
+        voters = [v1, v2, v3]
+
+        self.assertEqual(len(apply_voter_filter(voters, FILTER_MODE_ALL, "")), 3)
+        self.assertEqual(len(apply_voter_filter(voters, FILTER_MODE_NUMBER, "1, 3-4")), 3)
+        self.assertEqual(apply_voter_filter(voters, FILTER_MODE_NUMBER, "3"), [v2])
+        self.assertEqual(apply_voter_filter(voters, FILTER_MODE_RT, "3"), [v2, v3])
+        self.assertEqual(apply_voter_filter(voters, FILTER_MODE_RT, "03"), [v2, v3])
+        self.assertEqual(apply_voter_filter(voters, FILTER_MODE_RT, "003"), [v2, v3])
+        self.assertEqual(apply_voter_filter(voters, FILTER_MODE_RT, "RT 003"), [v2, v3])
+        self.assertEqual(apply_voter_filter(voters, FILTER_MODE_RT, "1"), [v1])
+        self.assertEqual(apply_voter_filter(voters, FILTER_MODE_NAME, "ade"), [v2])
+        self.assertEqual(apply_voter_filter(voters, FILTER_MODE_NAME, "adnan, budi"), [v1, v3])
+        self.assertEqual(apply_voter_filter(voters, FILTER_MODE_NAME, "Zorro"), [])
+
+        # 5. Test build_filter_filename_suffix
+        self.assertEqual(build_filter_filename_suffix(FILTER_MODE_ALL, ""), "")
+        self.assertEqual(build_filter_filename_suffix(FILTER_MODE_NUMBER, "15, 42"), "_CETAK_NO_15_42")
+        self.assertEqual(build_filter_filename_suffix(FILTER_MODE_NUMBER, "100-115"), "_CETAK_NO_100-115")
+        self.assertEqual(build_filter_filename_suffix(FILTER_MODE_RT, "003"), "_RT_003")
+        self.assertEqual(build_filter_filename_suffix(FILTER_MODE_NAME, "Ade"), "_FILTER_NAMA_ADE")
+
 if __name__ == "__main__":
     unittest.main()
