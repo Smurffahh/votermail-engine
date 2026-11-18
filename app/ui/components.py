@@ -99,7 +99,7 @@ class DocumentSourceRow(ctk.CTkFrame):
         self.btn_row.pack(fill="x", pady=(6, 0))
 
         is_word = "word" in self.doc_type.lower()
-        browse_text = "Pilih File Word" if is_word else "Pilih File Excel"
+        browse_text = "Pilih Template Word" if is_word else "Pilih Berkas DPT"
 
         # 1. Tombol Pilih File (Aksen Soft Biru)
         self.btn_browse = ctk.CTkButton(
@@ -112,9 +112,9 @@ class DocumentSourceRow(ctk.CTkFrame):
             border_color=THEME["btn_accent_soft_border"],
             text_color=THEME["btn_accent_soft_text"],
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            width=115,
+            width=125 if is_word else 115,
             height=30,
-            corner_radius=6,
+            corner_radius=self.theme.corner_radius_control,
         )
         self.btn_browse.pack(side="left", padx=(0, 6))
 
@@ -132,7 +132,7 @@ class DocumentSourceRow(ctk.CTkFrame):
                 font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
                 width=90,
                 height=30,
-                corner_radius=6,
+                corner_radius=self.theme.corner_radius_control,
             )
             self.btn_map_col.pack(side="left", padx=(0, 6))
 
@@ -150,11 +150,11 @@ class DocumentSourceRow(ctk.CTkFrame):
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
             width=recheck_width,
             height=30,
-            corner_radius=6,
+            corner_radius=self.theme.corner_radius_control,
         )
         self.btn_recheck.pack(side="left", padx=(0, 6))
 
-        # 3. Tombol Pratinjau PDF (Hanya untuk Word)
+        # 4. Tombol Pratinjau PDF (Hanya untuk Word)
         if self.on_preview:
             self.btn_preview = ctk.CTkButton(
                 self.btn_row,
@@ -168,7 +168,7 @@ class DocumentSourceRow(ctk.CTkFrame):
                 font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
                 width=110,
                 height=30,
-                corner_radius=6,
+                corner_radius=self.theme.corner_radius_control,
             )
             self.btn_preview.pack(side="left")
 
@@ -226,7 +226,7 @@ class CleanMetricBar(ctk.CTkFrame):
         m1_box.grid(row=0, column=0, padx=12, pady=8, sticky="nsew")
         self.lbl_t1 = ctk.CTkLabel(
             m1_box,
-            text="WILAYAH TERPILIH",
+            text="Wilayah terpilih",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
             text_color=THEME["text_secondary"],
         )
@@ -248,7 +248,7 @@ class CleanMetricBar(ctk.CTkFrame):
         m2_box.grid(row=0, column=2, padx=12, pady=8, sticky="nsew")
         self.lbl_t2 = ctk.CTkLabel(
             m2_box,
-            text="TOTAL PEMILIH",
+            text="Total pemilih",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
             text_color=THEME["text_secondary"],
         )
@@ -270,7 +270,7 @@ class CleanMetricBar(ctk.CTkFrame):
         m3_box.grid(row=0, column=4, padx=12, pady=8, sticky="nsew")
         self.lbl_t3 = ctk.CTkLabel(
             m3_box,
-            text="KEBUTUHAN KERTAS",
+            text="Kebutuhan kertas",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
             text_color=THEME["text_secondary"],
         )
@@ -438,7 +438,7 @@ class VoterPreviewTable(ctk.CTkFrame):
         self.header_row = ctk.CTkFrame(self, fg_color="transparent", height=28)
         self.header_row.pack(fill="x", padx=10, pady=(8, 4))
 
-        cols = [("NO", 40), ("NAMA PEMILIH", 170), ("L/P", 85), ("UMUR", 75)]
+        cols = [("No", 40), ("Nama Pemilih", 170), ("L/P", 85), ("Usia", 75)]
         for title, width in cols:
             lbl = ctk.CTkLabel(
                 self.header_row,
@@ -452,7 +452,7 @@ class VoterPreviewTable(ctk.CTkFrame):
 
         lbl_addr = ctk.CTkLabel(
             self.header_row,
-            text="ALAMAT & WILAYAH",
+            text="Alamat & Wilayah",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
             text_color=THEME["text_muted"],
             anchor="w",
@@ -469,7 +469,7 @@ class VoterPreviewTable(ctk.CTkFrame):
 
         self.empty_label = ctk.CTkLabel(
             self.rows_container,
-            text="Belum ada data pemilih. Silakan scan berkas Excel DPT terlebih dahulu.",
+            text="Belum ada data pemilih. Pilih dan scan berkas Excel DPT di kartu 1 untuk melihat pratinjau 5 pemilih pertama.",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
             text_color=THEME["text_muted"],
         )
@@ -958,7 +958,7 @@ class ColumnMapperModal(ctk.CTkToplevel):
                 variable=var,
                 width=230,
                 height=30,
-                corner_radius=self.theme.corner_radius_inner,
+                corner_radius=self.theme.corner_radius_control,
                 fg_color=THEME["bg_surface"],
                 button_color=THEME["btn_secondary_bg"],
                 button_hover_color=THEME["btn_secondary_hover"],
@@ -981,7 +981,7 @@ class ColumnMapperModal(ctk.CTkToplevel):
             border_color=THEME["border_surface"],
             text_color=THEME["btn_secondary_text"],
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            corner_radius=self.theme.corner_radius_inner,
+            corner_radius=self.theme.corner_radius_control,
             command=self.destroy,
         ).pack(side="right", padx=(8, 0))
 
@@ -993,7 +993,7 @@ class ColumnMapperModal(ctk.CTkToplevel):
             hover_color=THEME["btn_primary_hover"],
             text_color=THEME["btn_primary_text"],
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
-            corner_radius=self.theme.corner_radius_inner,
+            corner_radius=self.theme.corner_radius_control,
             command=self._apply_and_close,
         ).pack(side="right")
 
@@ -1002,8 +1002,8 @@ class ColumnMapperModal(ctk.CTkToplevel):
         nama_idx = self.label_to_col_idx.get(nama_choice)
         if nama_idx is None:
             messagebox.showwarning(
-                "Peringatan",
-                "Kolom 'Nama Pemilih' wajib ditentukan agar aplikasi dapat mencetak surat pemanggilan.",
+                "Kolom Nama Diperlukan",
+                "Kolom 'Nama Pemilih' wajib ditentukan agar aplikasi dapat mencetak surat pemanggilan.\n\nPilih kolom yang memuat nama warga dari daftar, lalu klik 'Terapkan & Scan Ulang'.",
             )
             return
 

@@ -404,7 +404,7 @@ class MainWindow(ctk.CTk):
 
         self.excel_status_bar = ctk.CTkLabel(
             self.card_kadus,
-            text="Belum ada file Excel yang dipindai.",
+            text="Belum ada berkas Excel DPT yang dipindai. Pilih berkas Excel di kartu 1 untuk menampilkan daftar wilayah.",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
             text_color=THEME["text_muted"],
             anchor="w",
@@ -544,7 +544,7 @@ class MainWindow(ctk.CTk):
 
         self.btn_start = ctk.CTkButton(
             btn_action_row,
-            text="Buat File PDF Sekarang",
+            text="Mulai Buat Surat PDF",
             height=38,
             fg_color=THEME["btn_disabled_bg"],
             hover_color=THEME["btn_primary_hover"],
@@ -734,9 +734,15 @@ class MainWindow(ctk.CTk):
             try:
                 os.startfile(folder)
             except Exception as exc:
-                messagebox.showerror("Error", f"Gagal membuka folder: {exc}")
+                messagebox.showerror(
+                    "Gagal Membuka Folder",
+                    f"Tidak dapat membuka folder hasil.\n\nPenyebab: {exc}\n\nSolusi: Pastikan path folder valid dan dapat diakses.",
+                )
         else:
-            messagebox.showinfo("Informasi", "Folder output belum dibuat di disk.")
+            messagebox.showinfo(
+                "Folder Belum Tersedia",
+                "Folder penyimpanan PDF belum dibuat di komputer Anda. Folder akan dibuat otomatis saat pratinjau atau proses cetak dimulai.",
+            )
 
     def _save_active_config(self) -> None:
         self.cfg.word_path = self.doc_row_word.current_path
@@ -861,8 +867,8 @@ class MainWindow(ctk.CTk):
     def _open_column_mapper(self) -> None:
         if not self.excel_scan_result or not self.excel_scan_result.available_columns:
             messagebox.showinfo(
-                "Informasi",
-                "Pilih berkas Excel DPT terlebih dahulu agar aplikasi dapat membaca daftar kolom yang tersedia.",
+                "Pilih Berkas DPT",
+                "Pilih dan scan berkas Excel DPT terlebih dahulu agar aplikasi dapat membaca daftar kolom yang tersedia.",
             )
             return
 
@@ -1063,7 +1069,7 @@ class MainWindow(ctk.CTk):
         if self.word_ready and self.excel_ready and selected_count > 0:
             self.btn_start.configure(
                 state="normal",
-                text="Buat File PDF Sekarang",
+                text="Mulai Buat Surat PDF",
                 fg_color=THEME["btn_primary_bg"],
                 hover_color=THEME["btn_primary_hover"],
                 text_color=THEME["btn_primary_text"],
@@ -1072,7 +1078,7 @@ class MainWindow(ctk.CTk):
         elif selected_count == 0 and self.word_ready and self.excel_ready:
             self.btn_start.configure(
                 state="disabled",
-                text="Pilih Minimal 1 Sheet Kadus",
+                text="Pilih Minimal 1 Wilayah Kadus",
                 fg_color=THEME["btn_disabled_bg"],
                 text_color=THEME["btn_disabled_text"],
             )
@@ -1080,7 +1086,7 @@ class MainWindow(ctk.CTk):
         else:
             self.btn_start.configure(
                 state="disabled",
-                text="Buat File PDF Sekarang",
+                text="Pilih Dokumen Word & Excel Dahulu",
                 fg_color=THEME["btn_disabled_bg"],
                 text_color=THEME["btn_disabled_text"],
             )
@@ -1088,7 +1094,10 @@ class MainWindow(ctk.CTk):
 
     def _generate_preview(self) -> None:
         if not self.word_check_result or not self.word_check_result.is_valid:
-            messagebox.showwarning("Peringatan", "Jalankan 'Cek Ulang' pada berkas Word terlebih dahulu.")
+            messagebox.showwarning(
+                "Template Belum Siap",
+                "Periksa template Word terlebih dahulu dengan menekan tombol 'Cek Ulang' di kartu 1 sebelum melakukan pratinjau.",
+            )
             return
 
         out_dir = self.output_entry.get().strip() or str(OUTPUT_DIR.resolve())
@@ -1118,9 +1127,15 @@ class MainWindow(ctk.CTk):
                 os.startfile(final_pdf)
             except Exception:
                 pass
-            messagebox.showinfo("Pratinjau Selesai", f"File pratinjau berhasil dibuat:\n{final_pdf}")
+            messagebox.showinfo(
+                "Pratinjau Berhasil",
+                f"Berkas pratinjau 1 lembar berhasil dibuat dan disimpan di:\n{final_pdf}",
+            )
         else:
-            messagebox.showerror("Gagal Pratinjau", f"Gagal membuat pratinjau Word: {msg}")
+            messagebox.showerror(
+                "Gagal Membuat Pratinjau",
+                f"Gagal membuat pratinjau surat melalui Microsoft Word.\n\nPenyebab: {msg}\n\nSolusi: Pastikan Microsoft Word terinstal dan tidak ada dialog Word yang terbuka.",
+            )
 
     def _start_mailing_process(self) -> None:
         if self.is_processing or not self.word_check_result or not self.excel_scan_result:
@@ -1131,7 +1146,10 @@ class MainWindow(ctk.CTk):
             if s.sheet_name in self.kadus_rows and self.kadus_rows[s.sheet_name].checkbox_var.get()
         ]
         if not selected_sheets:
-            messagebox.showwarning("Peringatan", "Pilih minimal 1 Sheet Kadus untuk dicetak.")
+            messagebox.showwarning(
+                "Pilih Wilayah Cetak",
+                "Pilih minimal 1 wilayah Kadus / RW pada kartu 2 untuk mulai mencetak surat panggilan.",
+            )
             return
 
         output_dir = self.output_entry.get().strip() or str(OUTPUT_DIR.resolve())
@@ -1143,7 +1161,7 @@ class MainWindow(ctk.CTk):
 
         self.btn_start.configure(
             state="disabled",
-            text="Sedang Memproses Mailing...",
+            text="Sedang Memproses Surat PDF...",
             fg_color=THEME["btn_disabled_bg"],
             text_color=THEME["btn_disabled_text"],
         )
@@ -1223,6 +1241,12 @@ class MainWindow(ctk.CTk):
 
     def _cancel_mailing(self) -> None:
         if self.is_processing:
+            confirm = messagebox.askyesno(
+                "Hentikan Proses Cetak?",
+                "Proses pembuatan surat panggilan sedang berjalan. Jika dibatalkan sekarang, berkas PDF yang sedang diproses tidak akan disimpan secara utuh.\n\nApakah Anda yakin ingin membatalkan?",
+            )
+            if not confirm:
+                return
             self.cancel_event.set()
             self._log("[BATAL] Mengirim sinyal pembatalan ke proses latar belakang...")
             self.btn_cancel.configure(state="disabled", text="Membatalkan...")
@@ -1238,14 +1262,20 @@ class MainWindow(ctk.CTk):
                     self.word_ready = False
                     self.doc_row_word.set_status(f"Gagal: {payload}", "error")
                     self._log(f"[WORD ERROR] {payload}")
-                    messagebox.showerror("Error Word", f"Gagal memeriksa file Word:\n{payload}")
+                    messagebox.showerror(
+                        "Pemeriksaan Word Gagal",
+                        f"Gagal memeriksa template Word.\n\nPenyebab: {payload}\n\nSolusi: Pastikan berkas tidak terkunci oleh Microsoft Word atau aplikasi lain, lalu coba lagi.",
+                    )
                 elif msg_type == "excel_done":
                     self._apply_excel_results(payload)
                 elif msg_type == "excel_error":
                     self.excel_ready = False
                     self.doc_row_excel.set_status(f"Gagal: {payload}", "error")
                     self._log(f"[EXCEL ERROR] {payload}")
-                    messagebox.showerror("Error Excel", f"Gagal membaca file Excel:\n{payload}")
+                    messagebox.showerror(
+                        "Pemindaian Excel Gagal",
+                        f"Gagal membaca data Excel DPT.\n\nPenyebab: {payload}\n\nSolusi: Pastikan format berkas .xlsx atau .xlsm dan tidak sedang dibuka di aplikasi lain.",
+                    )
 
                 elif msg_type == "kadus_started":
                     sheet_name = payload
@@ -1285,7 +1315,10 @@ class MainWindow(ctk.CTk):
                         self.kadus_rows[sheet_name].set_error("• Gagal")
                     self._on_process_finished()
                     self._log(f"[ERROR] Gagal memproses {sheet_name}: {err}")
-                    messagebox.showerror("Gagal Mailing", f"Terjadi kesalahan saat memproses {sheet_name}:\n{err}")
+                    messagebox.showerror(
+                        "Gagal Membuat PDF",
+                        f"Terjadi kesalahan saat memproses {sheet_name}.\n\nPenyebab: {err}\n\nSolusi: Pastikan Microsoft Word terinstal, tidak ada jendela Word yang menggantung, lalu coba lagi.",
+                    )
 
                 elif msg_type == "verify_started":
                     self._log(f"[AUDIT] Memverifikasi integritas PDF: {payload}...")
@@ -1305,7 +1338,7 @@ class MainWindow(ctk.CTk):
                 elif msg_type == "process_cancelled":
                     self._on_process_finished()
                     self._log(f"[BATAL] {payload}")
-                    messagebox.showinfo("Dibatalkan", "Proses mailing telah dihentikan pengguna.")
+                    messagebox.showinfo("Proses Dibatalkan", "Proses pembuatan surat panggilan telah dihentikan atas permintaan pengguna.")
 
                 elif msg_type == "all_completed":
                     kadus_count, total_v = payload
@@ -1320,8 +1353,8 @@ class MainWindow(ctk.CTk):
                     self._log(f"[SELESAI 100%] Berhasil membuat {kadus_count} file PDF ({total_v:,} pemilih) dalam {mins:02d}:{secs:02d}.")
                     clean_temp_dir()
                     messagebox.showinfo(
-                        "Mailing Selesai",
-                        f"Semua surat panggilan ({kadus_count} Kadus, {total_v:,} pemilih) berhasil dibuat di folder:\n{self.output_entry.get()}"
+                        "Pembuatan Surat Selesai",
+                        f"Seluruh berkas surat panggilan ({kadus_count} Kadus, {total_v:,} pemilih) berhasil dibuat dan siap dicetak di folder:\n{self.output_entry.get()}"
                     )
 
         except queue.Empty:

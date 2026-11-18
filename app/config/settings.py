@@ -88,6 +88,8 @@ def save_app_config(cfg: AppConfig) -> bool:
 def clean_temp_dir() -> None:
     if TEMP_DIR.exists():
         for item in TEMP_DIR.iterdir():
+            if item.name == ".gitkeep":
+                continue
             try:
                 if item.is_file():
                     item.unlink(missing_ok=True)

@@ -8,19 +8,22 @@ Dokumentasi arsitektur desain visual, token warna, tipografi, dan disiplin antar
 
 1. **Single Primary Accent Discipline**
    Hanya tombol tindakan eksekusi utama yang menggunakan aksen warna mencolok (*Emerald Green* `#10B981`). Seluruh tombol kontrol sekunder, dropdown, dan kartu file menggunakan warna netral bersahaja (*neutral slate*) agar mata pengguna terfokus pada status dan aksi berikutnya.
-2. **Concentric Border Radius**
-   Setiap kontainer bersarang mematuhi hukum konsentris optik:
-   - Kontainer terluar / Kartu Utama: `corner_radius = 12px`
-   - Kontainer bagian dalam / Baris Item / Input: `corner_radius = 8px`
-   - Tombol Pill / Badge status: `corner_radius = 6px`
+2. **Concentric Border Radius Architecture (`outer = inner + padding`)**
+   Setiap kontainer bersarang mematuhi hukum konsentris optik 4-tingkat:
+   - Kontainer Terluar / Kartu Utama / Modal Window: `corner_radius = 12px`
+   - Kontainer Dalam / Sub-kartu / Kotak Progress: `corner_radius = 8px`
+   - Elemen Kontrol Interaktif (Tombol Aksi, Dropdown OptionMenu, Input Field): `corner_radius = 6px`
+   - Elemen Mikro (Badge Status, Indikator Versi, Checkbox): `corner_radius = 4px`
 3. **Structural Hairline Borders**
    Gunakan garis batas struktural tipis `1px` (`#1E293B` pada Dark Mode, `#E2E8F0` pada Light Mode) untuk memisahkan hierarki kartu, bukan bayangan tebal (*heavy drop-shadows*) yang membuat antarmuka kotor.
 4. **Disiplin Tipografi & Tabular Numbers**
-   - Font Antarmuka Utama: `Segoe UI` (bobot 700 untuk judul, 600 untuk subjudul/kontrol, 400 untuk body teks).
-   - Font Numerik & Log Monospace: `Consolas` untuk nomor versi, jumlah pemilih, persentase progres, durasi waktu, dan log audit (`tabular-nums` demi kesejajaran visual).
-5. **Anti-AI Slop Discipline**
+   - Font Antarmuka Utama: `Segoe UI` (bobot 700 untuk judul seksi, 600 untuk subjudul/kontrol, 400 untuk body teks). Seluruh subjudul dan header tabel menggunakan *Sentence case* alami (tanpa ALL CAPS yang kaku).
+   - Font Numerik & Log Monospace: `Consolas` untuk nomor versi, jumlah pemilih, persentase progres, durasi waktu, dan log audit (`tabular-nums` demi mencegah pergeseran/jitter saat angka berubah dinamis).
+5. **Anti-AI Slop & UX Copy Discipline**
    - Dilarang menggunakan gradien ungu-biru generik.
    - Dilarang menggunakan teks copywriting klise ("solusi revolusioner", "senantiasa", "menyelami").
+   - Seluruh teks aksi menggunakan kata kerja spesifik (contoh: "Mulai Buat Surat PDF", "Pilih Template Word", "Pilih Berkas DPT").
+   - Pesan kesalahan wajib memuat 3 elemen: Apa yang terjadi + Penyebab masalah + Langkah konkret perbaikan.
    - Selalu sediakan 8-state pada elemen interaktif.
 
 ---

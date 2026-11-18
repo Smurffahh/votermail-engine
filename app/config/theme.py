@@ -66,6 +66,8 @@ class ThemeTokens:
     name: str = "Dark"
     corner_radius_card: int = 12
     corner_radius_inner: int = 8
+    corner_radius_control: int = 6
+    corner_radius_badge: int = 4
     font_family_main: str = "Segoe UI"
     font_family_mono: str = "Consolas"
 
