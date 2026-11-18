@@ -912,5 +912,20 @@ class TestMailMergeApp(unittest.TestCase):
             "KARANGJENGKOL, RT 001 / RW 001",
         )
 
+    def test_26_format_elapsed_time(self) -> None:
+        from app.ui.main_window import format_elapsed_time
+
+        self.assertEqual(format_elapsed_time(0), "00:00")
+        self.assertEqual(format_elapsed_time(0.4), "00:00")
+        self.assertEqual(format_elapsed_time(59), "00:59")
+        self.assertEqual(format_elapsed_time(59.9), "00:59")
+        self.assertEqual(format_elapsed_time(60), "01:00")
+        self.assertEqual(format_elapsed_time(131), "02:11")
+        self.assertEqual(format_elapsed_time(3599), "59:59")
+        self.assertEqual(format_elapsed_time(3600), "01:00:00")
+        self.assertEqual(format_elapsed_time(3665), "01:01:05")
+        self.assertEqual(format_elapsed_time(7325), "02:02:05")
+        self.assertEqual(format_elapsed_time(-10), "00:00")
+
 if __name__ == "__main__":
     unittest.main()

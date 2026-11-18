@@ -87,6 +87,12 @@ FEATURE_REGISTRY: list[dict[str, str]] = [
         "title": "Opsi Format Alamat Paten Berbasis Nama Sheet & Live Preview",
         "description": "Penambahan opsi format alamat paten 'Dusun [1..N], RT / RW, Desa Karangjengkol' berbasis nama sheet dengan pembaruan pratinjau instan.",
     },
+    {
+        "version": "1.8.4",
+        "date": "2026-11-18",
+        "title": "Stopwatch Waktu Berjalan Real-Time pada Progress Bar",
+        "description": "Penggantian indikator Estimasi Sisa menjadi penghitung Waktu Berjalan (Live Stopwatch) real-time yang terus berdetak hingga seluruh proses PDF selesai.",
+    },
 ]
 
 def get_current_version() -> str:

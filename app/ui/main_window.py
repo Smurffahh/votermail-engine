@@ -73,6 +73,14 @@ from app.ui.components import (
     apply_window_icon,
 )
 
+def format_elapsed_time(seconds: float) -> str:
+    total_secs = max(0, int(seconds))
+    hours, remainder = divmod(total_secs, 3600)
+    mins, secs = divmod(remainder, 60)
+    if hours > 0:
+        return f"{hours:02d}:{mins:02d}:{secs:02d}"
+    return f"{mins:02d}:{secs:02d}"
+
 class MainWindow(ctk.CTk):
     def __init__(self) -> None:
         if sys.platform == "win32":
@@ -620,13 +628,14 @@ class MainWindow(ctk.CTk):
         )
         self.status_detail_label.pack(side="left")
 
-        self.eta_label = ctk.CTkLabel(
+        self.time_label = ctk.CTkLabel(
             stats_row,
-            text="Estimasi Sisa Waktu: -",
-            font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
+            text="Waktu Berjalan: 00:00",
+            font=ctk.CTkFont(family="Consolas", size=12),
             text_color=THEME["text_secondary"],
         )
-        self.eta_label.pack(side="right")
+        self.time_label.pack(side="right")
+        self.eta_label = self.time_label
 
     def _build_card_activity(self, parent: ctk.CTkFrame) -> None:
         self.card_activity = ctk.CTkFrame(
@@ -1180,7 +1189,8 @@ class MainWindow(ctk.CTk):
 
         self.is_processing = True
         self.cancel_event.clear()
-        self.start_process_time = time.time()
+        self.start_process_time = time.monotonic()
+        self.time_label.configure(text="Waktu Berjalan: 00:00")
 
         self.btn_start.configure(
             state="disabled",
@@ -1277,6 +1287,10 @@ class MainWindow(ctk.CTk):
             self.btn_cancel.configure(state="disabled", text="Membatalkan...")
 
     def _poll_worker_queue(self) -> None:
+        if self.is_processing and self.start_process_time > 0:
+            elapsed = time.monotonic() - self.start_process_time
+            self.time_label.configure(text=f"Waktu Berjalan: {format_elapsed_time(elapsed)}")
+
         try:
             while True:
                 msg_type, payload = self.worker_queue.get_nowait()
@@ -1315,13 +1329,6 @@ class MainWindow(ctk.CTk):
                     self.status_detail_label.configure(
                         text=f"Selesai: {cur:,} / {tot:,} Pemilih ({pct * 100:.1f}%) • {sheet}".replace(",", ".")
                     )
-                    elapsed = time.time() - self.start_process_time
-                    if cur > 0 and elapsed > 1:
-                        speed = cur / elapsed
-                        rem = tot - cur
-                        eta_sec = rem / speed if speed > 0 else 0
-                        mins, secs = divmod(int(eta_sec), 60)
-                        self.eta_label.configure(text=f"Estimasi Sisa: {mins:02d}:{secs:02d} ({speed:.1f} pemilih/dtk)")
 
                 elif msg_type == "phase_update":
                     phase_text, _ = payload
@@ -1336,9 +1343,11 @@ class MainWindow(ctk.CTk):
 
                 elif msg_type == "kadus_failed":
                     sheet_name, err = payload
+                    elapsed = time.monotonic() - self.start_process_time if self.start_process_time > 0 else 0.0
                     if sheet_name in self.kadus_rows:
                         self.kadus_rows[sheet_name].set_error("• Gagal")
                     self._on_process_finished()
+                    self.time_label.configure(text=f"Waktu Berjalan: {format_elapsed_time(elapsed)} (Dihentikan)")
                     self._log(f"[ERROR] Gagal memproses {sheet_name}: {err}")
                     messagebox.showerror(
                         "Gagal Membuat PDF",
@@ -1361,21 +1370,22 @@ class MainWindow(ctk.CTk):
                     self._log(f"[AUDIT SELESAI] Laporan audit tersimpan di: {payload}", category="audit")
 
                 elif msg_type == "process_cancelled":
+                    elapsed = time.monotonic() - self.start_process_time if self.start_process_time > 0 else 0.0
                     self._on_process_finished()
+                    self.time_label.configure(text=f"Waktu Berjalan: {format_elapsed_time(elapsed)} (Dihentikan)")
                     self._log(f"[BATAL] {payload}")
                     messagebox.showinfo("Proses Dibatalkan", "Proses pembuatan surat panggilan telah dihentikan atas permintaan pengguna.")
 
                 elif msg_type == "all_completed":
                     kadus_count, total_v = payload
+                    elapsed = time.monotonic() - self.start_process_time if self.start_process_time > 0 else 0.0
                     self._on_process_finished()
-                    elapsed = time.time() - self.start_process_time
-                    mins, secs = divmod(int(elapsed), 60)
                     self.progress_bar.set(1.0)
-                    self.eta_label.configure(text=f"Total Waktu: {mins:02d}:{secs:02d}")
+                    self.time_label.configure(text=f"Waktu Berjalan: {format_elapsed_time(elapsed)} (Selesai)")
                     self.status_detail_label.configure(
                         text=f"Selesai 100%: {total_v:,} Pemilih ({kadus_count} Kadus)".replace(",", ".")
                     )
-                    self._log(f"[SELESAI 100%] Berhasil membuat {kadus_count} file PDF ({total_v:,} pemilih) dalam {mins:02d}:{secs:02d}.")
+                    self._log(f"[SELESAI 100%] Berhasil membuat {kadus_count} file PDF ({total_v:,} pemilih) dalam {format_elapsed_time(elapsed)}.")
                     clean_temp_dir()
                     messagebox.showinfo(
                         "Pembuatan Surat Selesai",
