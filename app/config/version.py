@@ -142,6 +142,19 @@ FEATURE_REGISTRY: list[dict[str, Any]] = [
             "Pemformatan log sistem monospace berlebar tetap dengan tag warna kategori dinamis dan tabel pratinjau ASCII 5 pemilih pertama.",
         ],
     },
+    {
+        "version": "1.9.2",
+        "date": "2026-11-18",
+        "title": "Penyelarasan Desain Pratinjau Pemilih & Tombol Log Kontekstual",
+        "description": "Penyelarasan desain tabel Pratinjau Pemilih agar serasi dengan Log Sistem & Hasil Cek PDF (penambahan sub-header status sampel, baris header berbingkai, struktur baris bergaris tipis dengan badge wilayah KADUS, penyembunyian otomatis scrollbar pada 5 sampel, serta tombol Bersihkan log kontekstual).",
+        "highlights": [
+            "Penyelarasan bahasa desain VoterPreviewTable dengan tab Log Sistem dan Hasil Cek PDF.",
+            "Penambahan sub-header status bar menampilkan ringkasan jumlah sampel terpilih dan mode alamat aktif.",
+            "Tabel 6 kolom terstruktur dengan pemisahan Alamat dan badge Wilayah KADUS tersendiri.",
+            "Penyembunyian scrollbar otomatis saat sampel berjumlah 5 baris untuk tampilan yang bersih.",
+            "Tombol 'Bersihkan' log sekarang kontekstual dan hanya muncul ketika tab Log Sistem aktif.",
+        ],
+    },
 ]
 
 def get_latest_release_entry() -> dict[str, Any]:

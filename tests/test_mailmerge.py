@@ -1338,5 +1338,114 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertTrue(any("MUHAMMAD ABDURRAHMAN ..." in l for l in table_lines))
         self.assertTrue(any("└" in l for l in table_lines))
 
+    def test_35_redesigned_voter_preview_table(self) -> None:
+        import customtkinter as ctk
+        from app.ui.components import VoterPreviewTable
+        from app.core.excel_scanner import VoterData
+        from app.config.theme import LIGHT_THEME, DARK_THEME
+        from app.config.settings import DEFAULT_ADDRESS_FORMAT
+
+        root = ctk.CTk()
+        root.withdraw()
+        try:
+            table = VoterPreviewTable(root, LIGHT_THEME)
+
+            self.assertIn("Menunggu data", table.lbl_status_summary.cget("text"))
+            self.assertIn("Format:", table.lbl_format_info.cget("text"))
+
+            sample_voters = [
+                VoterData(
+                    nomor=str(i + 1),
+                    nama=f"PEMILIH TEST {i + 1}",
+                    jenis_kelamin="Laki-laki" if i % 2 == 0 else "Perempuan",
+                    umur=f"{25 + i} Tahun",
+                    alamat=f"RT 00{i + 1} RW 001",
+                    rt=f"00{i + 1}",
+                    rw="001",
+                    sheet_name="KADUS 01",
+                    wilayah="KADUS 01",
+                    row_index=i + 10,
+                )
+                for i in range(5)
+            ]
+
+            table.set_voters(sample_voters, address_format=DEFAULT_ADDRESS_FORMAT, is_filtered=False, total_count=1250)
+            self.assertIn("Pratinjau Sampel:", table.lbl_status_summary.cget("text"))
+            self.assertIn("5 dari 1.250", table.lbl_status_summary.cget("text"))
+            self.assertEqual(len(table.rows_container.winfo_children()), 5)
+
+            header_labels = [c.cget("text") for c in table.header_row.winfo_children() if isinstance(c, ctk.CTkLabel)]
+            for col_name in ["NO", "NAMA PEMILIH", "L/P", "USIA", "ALAMAT PEMILIH", "WILAYAH"]:
+                self.assertIn(col_name, header_labels)
+
+            first_row = table.rows_container.winfo_children()[0]
+            row_labels = [c.cget("text") for c in first_row.winfo_children() if isinstance(c, ctk.CTkLabel)]
+            self.assertIn("01", row_labels)
+            self.assertIn("PEMILIH TEST 1", row_labels)
+            self.assertIn("Laki-laki", row_labels)
+            self.assertIn("25 Tahun", row_labels)
+
+            badge_frame = [c for c in first_row.winfo_children() if isinstance(c, ctk.CTkFrame)][0]
+            badge_label = [c for c in badge_frame.winfo_children() if isinstance(c, ctk.CTkLabel)][0]
+            self.assertEqual(badge_label.cget("text"), "KADUS 01")
+
+            table.update_address_format("RT / RW Saja (RT ... / RW ...)")
+            self.assertEqual(table.cached_address_format, "RT / RW Saja (RT ... / RW ...)")
+            self.assertIn("RT / RW Saja", table.lbl_format_info.cget("text"))
+
+            table.set_voters(
+                sample_voters[:2],
+                address_format=DEFAULT_ADDRESS_FORMAT,
+                is_filtered=True,
+                total_count=1250,
+                matched_count=45,
+            )
+            self.assertIn("Pratinjau Filter:", table.lbl_status_summary.cget("text"))
+            self.assertIn("2 dari 45 Pemilih Cocok", table.lbl_status_summary.cget("text"))
+            self.assertEqual(len(table.rows_container.winfo_children()), 2)
+
+            more_voters = [
+                VoterData(
+                    nomor=str(i + 1),
+                    nama=f"PEMILIH FILTER {i + 1}",
+                    jenis_kelamin="Laki-laki" if i % 2 == 0 else "Perempuan",
+                    umur=f"{30 + i} Tahun",
+                    alamat=f"RT 00{i + 1} RW 002",
+                    rt=f"00{i + 1}",
+                    rw="002",
+                    sheet_name="KADUS 02",
+                    wilayah="KADUS 02",
+                    row_index=i + 10,
+                )
+                for i in range(10)
+            ]
+            table.set_voters(more_voters, address_format=DEFAULT_ADDRESS_FORMAT, is_filtered=True, matched_count=10)
+            self.assertEqual(len(table.rows_container.winfo_children()), 10)
+
+            table.set_voters(
+                [],
+                address_format=DEFAULT_ADDRESS_FORMAT,
+                is_filtered=True,
+                matched_count=0,
+                empty_message="Tidak ada pemilih yang cocok dengan filter tersebut.",
+            )
+            self.assertIn("0 Pemilih Cocok", table.lbl_status_summary.cget("text"))
+            self.assertEqual(len(table.rows_container.winfo_children()), 1)
+
+            table.update_theme(DARK_THEME)
+            self.assertEqual(table.theme.name, "Dark")
+
+            # Contextual clear log button behavior simulation
+            btn_clear = ctk.CTkButton(root, text="Bersihkan")
+            self.assertEqual(btn_clear.winfo_manager(), "")
+
+            btn_clear.pack(side="left")
+            self.assertEqual(btn_clear.winfo_manager(), "pack")
+
+            btn_clear.pack_forget()
+            self.assertEqual(btn_clear.winfo_manager(), "")
+        finally:
+            root.destroy()
+
 if __name__ == "__main__":
     unittest.main()

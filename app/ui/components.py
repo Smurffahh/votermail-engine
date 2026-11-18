@@ -6,6 +6,7 @@ __author__ = "Danang Satria"
 import importlib.metadata
 import os
 from pathlib import Path
+import re
 import sys
 import threading
 from typing import Any, Callable, Literal
@@ -988,7 +989,7 @@ class KadusRowItem(ctk.CTkFrame):
 KadusItemRow = KadusRowItem
 
 class VoterPreviewTable(ctk.CTkFrame):
-    """Tabel pratinjau 5 contoh data pemilih yang telah ditransformasikan."""
+    """Tabel pratinjau data pemilih yang telah ditransformasikan dengan tata letak monospace terstruktur."""
 
     def __init__(self, master: any, theme: ThemeTokens, **kwargs) -> None:
         super().__init__(
@@ -1002,50 +1003,132 @@ class VoterPreviewTable(ctk.CTkFrame):
         self.theme = theme
         self.cached_voters: list[VoterData] = []
         self.cached_address_format: str = DEFAULT_ADDRESS_FORMAT
+        self.is_filtered: bool = False
+        self.custom_empty_message: str | None = None
+        self.total_count: int | None = None
+        self.matched_count: int | None = None
 
         self._build_ui()
 
+    def _configure_grid_columns(self, frame: ctk.CTkFrame) -> None:
+        frame.grid_columnconfigure(0, weight=0, minsize=48)
+        frame.grid_columnconfigure(1, weight=2, minsize=190)
+        frame.grid_columnconfigure(2, weight=0, minsize=95)
+        frame.grid_columnconfigure(3, weight=0, minsize=80)
+        frame.grid_columnconfigure(4, weight=4)
+        frame.grid_columnconfigure(5, weight=0, minsize=95)
+
     def _build_ui(self) -> None:
-        # Table Header
-        self.header_row = ctk.CTkFrame(self, fg_color="transparent", height=28)
-        self.header_row.pack(fill="x", padx=10, pady=(8, 4))
+        # 1. Sub-Header Status Bar
+        self.status_bar = ctk.CTkFrame(
+            self,
+            fg_color=THEME["bg_elevated"],
+            corner_radius=6,
+            height=32,
+        )
+        self.status_bar.pack(fill="x", padx=10, pady=(8, 4))
 
-        cols = [("No", 40), ("Nama Pemilih", 170), ("L/P", 85), ("Usia", 75)]
-        for title, width in cols:
-            lbl = ctk.CTkLabel(
-                self.header_row,
-                text=title,
-                font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
-                text_color=THEME["text_muted"],
-                width=width,
-                anchor="w",
-            )
-            lbl.pack(side="left", padx=4)
+        self.status_left = ctk.CTkFrame(self.status_bar, fg_color="transparent")
+        self.status_left.pack(side="left", fill="y", padx=(10, 4))
 
-        lbl_addr = ctk.CTkLabel(
-            self.header_row,
-            text="Alamat & Wilayah",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
+        self.lbl_status_indicator = ctk.CTkLabel(
+            self.status_left,
+            text="•",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=14, weight="bold"),
             text_color=THEME["text_muted"],
+        )
+        self.lbl_status_indicator.pack(side="left", padx=(0, 4))
+
+        self.lbl_status_summary = ctk.CTkLabel(
+            self.status_left,
+            text="Pratinjau Sampel: Menunggu data Excel DPT",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            text_color=THEME["text_primary"],
             anchor="w",
         )
-        lbl_addr.pack(side="left", fill="x", expand=True, padx=4)
+        self.lbl_status_summary.pack(side="left")
 
-        # Hairline separator
-        self.divider = ctk.CTkFrame(self, fg_color=THEME["border_surface"], height=1)
-        self.divider.pack(fill="x", padx=6, pady=2)
-
-        # Rows Container
-        self.rows_container = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        self.rows_container.pack(fill="both", expand=True, padx=6, pady=(2, 8))
-
-        self.empty_label = ctk.CTkLabel(
-            self.rows_container,
-            text="Belum ada data pemilih. Pilih dan scan berkas Excel DPT di kartu 1 untuk melihat pratinjau 5 pemilih pertama.",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
-            text_color=THEME["text_muted"],
+        self.lbl_format_info = ctk.CTkLabel(
+            self.status_bar,
+            text=f"Format: {self.cached_address_format}",
+            font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
+            text_color=THEME["text_secondary"],
+            anchor="e",
         )
-        self.empty_label.pack(pady=24)
+        self.lbl_format_info.pack(side="right", padx=(0, 10))
+
+        # 2. Column Header Bar
+        self.header_row = ctk.CTkFrame(
+            self,
+            fg_color=THEME["bg_surface"],
+            border_width=1,
+            border_color=THEME["border_surface"],
+            corner_radius=6,
+            height=30,
+        )
+        self.header_row.pack(fill="x", padx=10, pady=(0, 4))
+
+        self._configure_grid_columns(self.header_row)
+
+        ctk.CTkLabel(
+            self.header_row,
+            text="NO",
+            font=ctk.CTkFont(family=self.theme.font_family_mono, size=11, weight="bold"),
+            text_color=THEME["text_muted"],
+            anchor="w",
+        ).grid(row=0, column=0, padx=(10, 4), pady=5, sticky="w")
+
+        ctk.CTkLabel(
+            self.header_row,
+            text="NAMA PEMILIH",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            text_color=THEME["text_muted"],
+            anchor="w",
+        ).grid(row=0, column=1, padx=4, pady=5, sticky="w")
+
+        ctk.CTkLabel(
+            self.header_row,
+            text="L/P",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            text_color=THEME["text_muted"],
+            anchor="w",
+        ).grid(row=0, column=2, padx=4, pady=5, sticky="w")
+
+        ctk.CTkLabel(
+            self.header_row,
+            text="USIA",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            text_color=THEME["text_muted"],
+            anchor="w",
+        ).grid(row=0, column=3, padx=4, pady=5, sticky="w")
+
+        ctk.CTkLabel(
+            self.header_row,
+            text="ALAMAT PEMILIH",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            text_color=THEME["text_muted"],
+            anchor="w",
+        ).grid(row=0, column=4, padx=4, pady=5, sticky="ew")
+
+        ctk.CTkLabel(
+            self.header_row,
+            text="WILAYAH",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            text_color=THEME["text_muted"],
+            anchor="e",
+        ).grid(row=0, column=5, padx=(4, 10), pady=5, sticky="e")
+
+        # 3. Rows Container (CTkScrollableFrame)
+        self.rows_container = ctk.CTkScrollableFrame(
+            self,
+            fg_color="transparent",
+            scrollbar_fg_color="transparent",
+            scrollbar_button_color=THEME["bg_elevated"],
+            scrollbar_button_hover_color=THEME["border_surface"],
+        )
+        self.rows_container.pack(fill="both", expand=True, padx=10, pady=(0, 8))
+
+        self._render_rows()
 
     def set_voters(
         self,
@@ -1053,95 +1136,233 @@ class VoterPreviewTable(ctk.CTkFrame):
         address_format: str | None = None,
         is_filtered: bool = False,
         empty_message: str | None = None,
+        total_count: int | None = None,
+        matched_count: int | None = None,
     ) -> None:
         self.cached_voters = list(voters)
         self.is_filtered = is_filtered
         self.custom_empty_message = empty_message
+        if total_count is not None:
+            self.total_count = total_count
+        if matched_count is not None:
+            self.matched_count = matched_count
         if address_format:
             self.cached_address_format = address_format
         self._render_rows()
 
     def update_address_format(self, address_format: str) -> None:
         self.cached_address_format = address_format
+        self.lbl_format_info.configure(text=f"Format: {address_format}")
         self._render_rows()
 
     def _render_rows(self) -> None:
         for child in self.rows_container.winfo_children():
             child.destroy()
 
-        if not self.cached_voters:
-            msg = getattr(self, "custom_empty_message", None) or (
+        limit = 25 if self.is_filtered else 5
+        displayed_voters = self.cached_voters[:limit]
+        shown_count = len(displayed_voters)
+
+        format_display = self.cached_address_format or DEFAULT_ADDRESS_FORMAT
+        self.lbl_format_info.configure(text=f"Format: {format_display}")
+
+        if self.is_filtered:
+            matched = self.matched_count if self.matched_count is not None else len(self.cached_voters)
+            if matched > 0:
+                self.lbl_status_indicator.configure(text="•", text_color=THEME["status_info_text"])
+                self.lbl_status_summary.configure(
+                    text=f"Pratinjau Filter: Menampilkan {shown_count} dari {matched:,} Pemilih Cocok".replace(",", ".")
+                )
+            else:
+                self.lbl_status_indicator.configure(text="•", text_color=THEME["status_error_text"])
+                self.lbl_status_summary.configure(text="Pratinjau Filter: 0 Pemilih Cocok")
+        else:
+            if self.cached_voters:
+                tot = self.total_count if (self.total_count is not None and self.total_count > 0) else len(self.cached_voters)
+                self.lbl_status_indicator.configure(text="•", text_color=THEME["status_ready_text"])
+                self.lbl_status_summary.configure(
+                    text=f"Pratinjau Sampel: Menampilkan {shown_count} dari {tot:,} Pemilih".replace(",", ".")
+                )
+            else:
+                self.lbl_status_indicator.configure(text="•", text_color=THEME["text_muted"])
+                self.lbl_status_summary.configure(text="Pratinjau Sampel: Menunggu data Excel DPT")
+
+        # Scrollbar visibility control
+        if len(displayed_voters) <= 6:
+            try:
+                self.rows_container._scrollbar.grid_remove()
+            except Exception:
+                pass
+        else:
+            try:
+                self.rows_container._scrollbar.grid()
+                self.rows_container.configure(
+                    scrollbar_fg_color="transparent",
+                    scrollbar_button_color=THEME["bg_elevated"],
+                    scrollbar_button_hover_color=THEME["border_surface"],
+                )
+            except Exception:
+                pass
+
+        if not displayed_voters:
+            msg = self.custom_empty_message or (
                 "Tidak ada pemilih yang cocok dengan filter. Periksa kembali nomor, RT, atau nama yang diketik."
-                if getattr(self, "is_filtered", False)
+                if self.is_filtered
                 else "Belum ada data pemilih. Pilih dan scan berkas Excel DPT di kartu 1 untuk melihat pratinjau 5 pemilih pertama."
             )
-            self.empty_label = ctk.CTkLabel(
+            empty_box = ctk.CTkFrame(
                 self.rows_container,
-                text=msg,
+                fg_color=THEME["bg_elevated"],
+                border_color=THEME["border_surface"],
+                border_width=1,
+                corner_radius=6,
+            )
+            empty_box.pack(fill="x", padx=16, pady=32)
+
+            ctk.CTkLabel(
+                empty_box,
+                text="ℹ  " + msg,
                 font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
                 text_color=THEME["text_muted"],
-            )
-            self.empty_label.pack(pady=24)
+                justify="center",
+                wraplength=650,
+            ).pack(padx=16, pady=20)
             return
 
-        limit = 25 if getattr(self, "is_filtered", False) else 5
-        for voter in self.cached_voters[:limit]:
-            row = ctk.CTkFrame(self.rows_container, fg_color="transparent", height=24)
-            row.pack(fill="x", padx=4, pady=2)
+        for idx, voter in enumerate(displayed_voters):
+            # Alternating row colors
+            is_odd_item = (idx % 2 == 0)
+            bg_col = THEME["bg_surface"] if is_odd_item else "transparent"
+            border_col = THEME["border_card"]
+            border_w = 0 if is_odd_item else 1
 
-            c1 = ctk.CTkLabel(
-                row,
-                text=voter.nomor,
-                font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
-                text_color=THEME["text_secondary"],
-                width=40,
+            row_frame = ctk.CTkFrame(
+                self.rows_container,
+                fg_color=bg_col,
+                border_color=border_col,
+                border_width=border_w,
+                corner_radius=6,
+                height=34,
+            )
+            row_frame.pack(fill="x", padx=2, pady=2)
+            self._configure_grid_columns(row_frame)
+
+            def _bind_hover(target: Any, target_row: ctk.CTkFrame, default_bg: Any) -> None:
+                def _on_enter(e: Any) -> None:
+                    try:
+                        target_row.configure(fg_color=THEME["bg_hover"])
+                    except Exception:
+                        pass
+                def _on_leave(e: Any) -> None:
+                    try:
+                        target_row.configure(fg_color=default_bg)
+                    except Exception:
+                        pass
+                target.bind("<Enter>", _on_enter, add="+")
+                target.bind("<Leave>", _on_leave, add="+")
+
+            _bind_hover(row_frame, row_frame, bg_col)
+
+            # Col 0: NO
+            lbl_no = ctk.CTkLabel(
+                row_frame,
+                text=f"{idx + 1:02d}",
+                font=ctk.CTkFont(family=self.theme.font_family_mono, size=12),
+                text_color=THEME["text_muted"],
                 anchor="w",
             )
-            c1.pack(side="left", padx=4)
+            lbl_no.grid(row=0, column=0, padx=(10, 4), pady=5, sticky="w")
+            _bind_hover(lbl_no, row_frame, bg_col)
 
-            c2 = ctk.CTkLabel(
-                row,
+            # Col 1: NAMA PEMILIH
+            lbl_nama = ctk.CTkLabel(
+                row_frame,
                 text=voter.nama,
-                font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=12, weight="bold"),
                 text_color=THEME["text_primary"],
-                width=170,
                 anchor="w",
             )
-            c2.pack(side="left", padx=4)
+            lbl_nama.grid(row=0, column=1, padx=4, pady=5, sticky="w")
+            _bind_hover(lbl_nama, row_frame, bg_col)
 
-            c3 = ctk.CTkLabel(
-                row,
-                text=voter.jenis_kelamin,
-                font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            # Col 2: L/P
+            jk_raw = voter.jenis_kelamin.strip().upper()
+            if jk_raw in ("L", "LAKI-LAKI"):
+                jk_clean = "Laki-laki"
+            elif jk_raw in ("P", "PEREMPUAN"):
+                jk_clean = "Perempuan"
+            else:
+                jk_clean = voter.jenis_kelamin
+
+            lbl_jk = ctk.CTkLabel(
+                row_frame,
+                text=jk_clean,
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=12),
                 text_color=THEME["text_secondary"],
-                width=85,
                 anchor="w",
             )
-            c3.pack(side="left", padx=4)
+            lbl_jk.grid(row=0, column=2, padx=4, pady=5, sticky="w")
+            _bind_hover(lbl_jk, row_frame, bg_col)
 
-            c4 = ctk.CTkLabel(
-                row,
-                text=voter.umur,
-                font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
+            # Col 3: USIA
+            umur_val = str(voter.umur).strip()
+            if not umur_val or umur_val == "-":
+                umur_clean = "-"
+            else:
+                raw_num = re.sub(r"(?i)\s*(tahun|thn).*$", "", umur_val).strip()
+                umur_clean = f"{raw_num} Tahun" if raw_num else umur_val
+            lbl_umur = ctk.CTkLabel(
+                row_frame,
+                text=umur_clean,
+                font=ctk.CTkFont(family=self.theme.font_family_mono, size=12),
                 text_color=THEME["text_secondary"],
-                width=75,
                 anchor="w",
             )
-            c4.pack(side="left", padx=4)
+            lbl_umur.grid(row=0, column=3, padx=4, pady=5, sticky="w")
+            _bind_hover(lbl_umur, row_frame, bg_col)
 
+            # Col 4: ALAMAT PEMILIH
             display_addr = build_voter_address(voter, self.cached_address_format) if self.cached_address_format else voter.alamat
-            alamat_wilayah = f"{display_addr} ({voter.sheet_name})" if voter.sheet_name else display_addr
-            c5 = ctk.CTkLabel(
-                row,
-                text=alamat_wilayah,
-                font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            lbl_addr = ctk.CTkLabel(
+                row_frame,
+                text=display_addr,
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=12),
                 text_color=THEME["text_secondary"],
                 anchor="w",
             )
-            c5.pack(side="left", fill="x", expand=True, padx=4)
+            lbl_addr.grid(row=0, column=4, padx=4, pady=5, sticky="ew")
+            _bind_hover(lbl_addr, row_frame, bg_col)
+
+            # Col 5: WILAYAH (Pill badge)
+            wilayah_name = voter.sheet_name.strip() if voter.sheet_name else "KADUS 1"
+            badge = ctk.CTkFrame(
+                row_frame,
+                fg_color=THEME["bg_elevated"],
+                border_color=THEME["border_surface"],
+                border_width=1,
+                corner_radius=4,
+                height=22,
+            )
+            badge.grid(row=0, column=5, padx=(4, 10), pady=5, sticky="e")
+            _bind_hover(badge, row_frame, bg_col)
+
+            badge_lbl = ctk.CTkLabel(
+                badge,
+                text=wilayah_name.upper(),
+                font=ctk.CTkFont(family=self.theme.font_family_mono, size=10, weight="bold"),
+                text_color=THEME["btn_accent_soft_text"],
+            )
+            badge_lbl.pack(padx=8, pady=2)
+            _bind_hover(badge_lbl, row_frame, bg_col)
 
     def update_theme(self, theme: ThemeTokens) -> None:
-        pass
+        self.theme = theme
+        self.configure(fg_color=THEME["bg_surface"], border_color=THEME["border_surface"])
+        if hasattr(self, "status_bar"):
+            self.status_bar.configure(fg_color=THEME["bg_elevated"])
+        if hasattr(self, "header_row"):
+            self.header_row.configure(fg_color=THEME["bg_surface"], border_color=THEME["border_surface"])
+        self._render_rows()
 
 class MetricCard(ctk.CTkFrame):
     """Kartu metrik mandiri (kompatibilitas)."""

@@ -887,7 +887,6 @@ class MainWindow(ctk.CTk):
             text_color=THEME["btn_secondary_text"],
             command=self._clear_logs,
         )
-        self.btn_clear_log.pack(side="left")
 
         self.activity_content_frame = ctk.CTkFrame(self.card_activity, fg_color="transparent")
         self.activity_content_frame.pack(fill="both", expand=True, padx=14, pady=(0, 10))
@@ -1097,6 +1096,8 @@ class MainWindow(ctk.CTk):
                 preview_voters,
                 address_format=curr_addr_mode,
                 is_filtered=True,
+                total_count=total_unfiltered,
+                matched_count=total_matched_all,
                 empty_message="Tidak ada pemilih yang cocok dengan filter tersebut. Periksa kembali nomor/RT/nama yang diketik.",
             )
         else:
@@ -1112,7 +1113,12 @@ class MainWindow(ctk.CTk):
                         sample_voters.extend(s.voters)
                         if len(sample_voters) >= 5:
                             break
-            self.voter_table.set_voters(sample_voters[:5], address_format=curr_addr_mode, is_filtered=False)
+            self.voter_table.set_voters(
+                sample_voters[:5],
+                address_format=curr_addr_mode,
+                is_filtered=False,
+                total_count=self.excel_scan_result.total_voters if self.excel_scan_result else 0,
+            )
 
         # Update FilterStatusBanner states
         if hasattr(self, "filter_status_banner"):
@@ -1192,6 +1198,8 @@ class MainWindow(ctk.CTk):
         self._apply_log_tag_styles()
         if hasattr(self, "filter_status_banner"):
             self.filter_status_banner.update_theme(self.theme)
+        if hasattr(self, "voter_table"):
+            self.voter_table.update_theme(self.theme)
         if hasattr(self, "btn_preview_header"):
             self.btn_preview_header.configure(
                 fg_color=THEME["btn_accent_soft_bg"],
@@ -1385,6 +1393,12 @@ class MainWindow(ctk.CTk):
         self.audit_textbox.pack_forget()
         self.log_textbox.pack_forget()
 
+        if hasattr(self, "btn_clear_log"):
+            if val == "Log Sistem":
+                self.btn_clear_log.pack(side="left")
+            else:
+                self.btn_clear_log.pack_forget()
+
         if val == "Pratinjau Pemilih":
             self.current_log_tab = "preview"
             self.voter_table.pack(fill="both", expand=True)
@@ -1558,7 +1572,11 @@ class MainWindow(ctk.CTk):
                 sample_voters.extend(s.voters)
                 if len(sample_voters) >= 5:
                     break
-        self.voter_table.set_voters(sample_voters[:5], address_format=self.address_mode_menu.get().strip())
+        self.voter_table.set_voters(
+            sample_voters[:5],
+            address_format=self.address_mode_menu.get().strip(),
+            total_count=res.total_voters,
+        )
 
         self.excel_ready = True
         if res.is_valid:
