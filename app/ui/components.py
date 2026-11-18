@@ -7,6 +7,7 @@ import importlib.metadata
 import os
 from pathlib import Path
 import sys
+import threading
 from typing import Any, Callable, Literal
 import webbrowser
 from tkinter import messagebox
@@ -827,8 +828,26 @@ class AboutModal(ctk.CTkToplevel):
         )
         hist_scroll.pack(fill="both", expand=True, padx=16, pady=(0, 10))
 
+        footer_row = ctk.CTkFrame(content_frame, fg_color="transparent")
+        footer_row.pack(fill="x", padx=16, pady=(0, 14))
+
+        self.btn_check_update = ctk.CTkButton(
+            footer_row,
+            text="Cek Pembaruan",
+            height=32,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_color=THEME["border_surface"],
+            border_width=1,
+            text_color=THEME["btn_secondary_text"],
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            corner_radius=self.theme.corner_radius_inner,
+            command=self._manual_check_updates,
+        )
+        self.btn_check_update.pack(side="left")
+
         btn_close = ctk.CTkButton(
-            content_frame,
+            footer_row,
             text="Tutup",
             height=32,
             fg_color=THEME["btn_secondary_bg"],
@@ -840,7 +859,7 @@ class AboutModal(ctk.CTkToplevel):
             corner_radius=self.theme.corner_radius_inner,
             command=self.destroy,
         )
-        btn_close.pack(anchor="e", padx=16, pady=(0, 14))
+        btn_close.pack(side="right")
 
         for feat in reversed(FEATURE_REGISTRY):
             item = ctk.CTkFrame(hist_scroll, fg_color="transparent")
@@ -883,6 +902,274 @@ class AboutModal(ctk.CTkToplevel):
                     wraplength=480,
                     justify="left",
                 ).pack(anchor="w", pady=(1, 0))
+
+    def _manual_check_updates(self) -> None:
+        self.btn_check_update.configure(state="disabled", text="Memeriksa...")
+
+        def run_check() -> None:
+            from app.core.updater import check_for_updates
+            info = check_for_updates(__version__)
+
+            def finish() -> None:
+                self.btn_check_update.configure(state="normal", text="Cek Pembaruan")
+                if info.get("update_available"):
+                    master = self.master
+                    self.destroy()
+                    UpdateNotificationModal(master, self.theme, info)
+                elif info.get("error"):
+                    messagebox.showwarning(
+                        "Gagal Memeriksa",
+                        f"Tidak dapat terhubung ke server pembaruan: {info['error']}",
+                    )
+                else:
+                    messagebox.showinfo(
+                        "Sudah Versi Terbaru",
+                        f"✓ Anda sudah menggunakan versi terbaru (v{__version__}).",
+                    )
+
+            self.after(0, finish)
+
+        threading.Thread(target=run_check, daemon=True).start()
+
+class UpdateNotificationModal(ctk.CTkToplevel):
+    def __init__(self, master: any, theme: ThemeTokens, update_info: dict[str, Any]) -> None:
+        super().__init__(master)
+        self.theme = theme
+        self.update_info = update_info
+        latest_ver = update_info.get("latest_version", "Baru")
+
+        self.title(f"Pembaruan Tersedia: VoterMail Engine v{latest_ver}")
+        self.geometry("580x530")
+        self.minsize(520, 460)
+        self.configure(fg_color=THEME["bg_root"])
+        apply_window_icon(self)
+
+        self.transient(master)
+        self.grab_set()
+
+        self.update_idletasks()
+        try:
+            mx = master.winfo_x()
+            my = master.winfo_y()
+            mw = master.winfo_width()
+            mh = master.winfo_height()
+            x = mx + (mw - 580) // 2
+            y = my + (mh - 530) // 2
+            self.geometry(f"580x530+{max(0, x)}+{max(0, y)}")
+        except Exception:
+            pass
+
+        self.bind("<Escape>", lambda e: self.destroy())
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        content_frame = ctk.CTkFrame(
+            self,
+            fg_color=THEME["bg_card"],
+            border_color=THEME["border_card"],
+            border_width=1,
+            corner_radius=self.theme.corner_radius_card,
+        )
+        content_frame.pack(fill="both", expand=True, padx=16, pady=16)
+
+        # Header Frame
+        header_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        header_frame.pack(fill="x", padx=16, pady=(16, 10))
+
+        title_row = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_row.pack(fill="x")
+
+        if APP_ICON_PNG.exists():
+            try:
+                from PIL import Image
+                logo_pil = Image.open(APP_ICON_PNG)
+                self.modal_logo_img = ctk.CTkImage(light_image=logo_pil, dark_image=logo_pil, size=(36, 36))
+                icon_lbl = ctk.CTkLabel(title_row, image=self.modal_logo_img, text="")
+                icon_lbl.pack(side="left", padx=(0, 10))
+            except Exception:
+                pass
+
+        latest_ver = self.update_info.get("latest_version", "Baru")
+        curr_ver = self.update_info.get("current_version", __version__)
+
+        app_title = ctk.CTkLabel(
+            title_row,
+            text=f"Pembaruan Tersedia: v{latest_ver}",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=18, weight="bold"),
+            text_color=THEME["text_primary"],
+        )
+        app_title.pack(side="left")
+
+        # Subtitle Version Pill
+        ver_pill = ctk.CTkFrame(
+            header_frame,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
+            border_width=1,
+            corner_radius=6,
+        )
+        ver_pill.pack(anchor="w", pady=(8, 0))
+
+        ver_text = f"Versi Anda saat ini: v{curr_ver}  →  Versi Terbaru: v{latest_ver}"
+        ctk.CTkLabel(
+            ver_pill,
+            text=ver_text,
+            font=ctk.CTkFont(family=self.theme.font_family_mono, size=11, weight="bold"),
+            text_color=THEME["status_ready_text"],
+        ).pack(padx=10, pady=4)
+
+        # Release Notes Section
+        notes_label = ctk.CTkLabel(
+            content_frame,
+            text=f"Apa yang Baru di Versi v{latest_ver}:",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            text_color=THEME["text_primary"],
+        )
+        notes_label.pack(anchor="w", padx=16, pady=(12, 4))
+
+        self.notes_box = ctk.CTkTextbox(
+            content_frame,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
+            border_width=1,
+            corner_radius=self.theme.corner_radius_inner,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            text_color=THEME["text_secondary"],
+            wrap="word",
+            height=140,
+        )
+        self.notes_box.pack(fill="both", expand=True, padx=16, pady=(0, 8))
+
+        raw_notes = self.update_info.get("release_notes", "").strip()
+        if not raw_notes:
+            raw_notes = "Pembaruan kestabilan, peningkatan performa, dan penyempurnaan antarmuka VoterMail Engine."
+        self.notes_box.insert("1.0", raw_notes)
+        self.notes_box.configure(state="disabled")
+
+        # Safety Reassurance Banner
+        safe_frame = ctk.CTkFrame(
+            content_frame,
+            fg_color=THEME["status_ready_bg"],
+            border_color=THEME["border_surface"],
+            border_width=1,
+            corner_radius=6,
+        )
+        safe_frame.pack(fill="x", padx=16, pady=(0, 10))
+
+        ctk.CTkLabel(
+            safe_frame,
+            text="✓ Seluruh file Excel DPT, template Word, dan hasil PDF Anda di folder data/ tetap aman 100% dan tidak akan terhapus.",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
+            text_color=THEME["status_ready_text"],
+            justify="left",
+            wraplength=520,
+        ).pack(anchor="w", padx=10, pady=6)
+
+        # Progress Area (Initially Unpacked)
+        self.progress_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        self.progress_bar = ctk.CTkProgressBar(
+            self.progress_frame,
+            height=10,
+            corner_radius=5,
+            fg_color=THEME["bg_surface"],
+            progress_color=THEME["btn_primary_bg"],
+        )
+        self.progress_bar.pack(fill="x", pady=(2, 4))
+        self.progress_bar.set(0.0)
+
+        self.progress_label = ctk.CTkLabel(
+            self.progress_frame,
+            text="Menyiapkan unduhan...",
+            font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
+            text_color=THEME["text_secondary"],
+        )
+        self.progress_label.pack(anchor="w")
+
+        # Action Buttons Row
+        self.btn_row = ctk.CTkFrame(content_frame, fg_color="transparent")
+        self.btn_row.pack(fill="x", padx=16, pady=(0, 14))
+
+        self.btn_later = ctk.CTkButton(
+            self.btn_row,
+            text="Nanti Saja",
+            width=100,
+            height=34,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_color=THEME["border_surface"],
+            border_width=1,
+            text_color=THEME["btn_secondary_text"],
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            corner_radius=self.theme.corner_radius_inner,
+            command=self.destroy,
+        )
+        self.btn_later.pack(side="left", padx=(0, 8))
+
+        self.btn_github = ctk.CTkButton(
+            self.btn_row,
+            text="Lihat di GitHub",
+            width=120,
+            height=34,
+            fg_color=THEME["btn_secondary_bg"],
+            hover_color=THEME["btn_secondary_hover"],
+            border_color=THEME["border_surface"],
+            border_width=1,
+            text_color=THEME["btn_secondary_text"],
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            corner_radius=self.theme.corner_radius_inner,
+            command=lambda: webbrowser.open(self.update_info.get("html_url", f"{__repository__}/releases/latest")),
+        )
+        self.btn_github.pack(side="left")
+
+        self.btn_update = ctk.CTkButton(
+            self.btn_row,
+            text=f"Update Sekarang (v{latest_ver})",
+            height=34,
+            fg_color=THEME["btn_primary_bg"],
+            hover_color=THEME["btn_primary_hover"],
+            text_color=THEME["btn_primary_text"],
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            corner_radius=self.theme.corner_radius_inner,
+            command=self._start_update,
+        )
+        self.btn_update.pack(side="right")
+
+    def _start_update(self) -> None:
+        self.btn_later.configure(state="disabled")
+        self.btn_github.configure(state="disabled")
+        self.btn_update.configure(state="disabled", text="Memperbarui...")
+
+        self.progress_frame.pack(fill="x", padx=16, pady=(0, 10), before=self.btn_row)
+        self.progress_bar.set(0.0)
+
+        def worker() -> None:
+            from app.core.updater import download_and_apply_update
+
+            def prog_cb(cur: int, tot: int, msg: str) -> None:
+                pct = cur / tot if tot > 0 else 0.0
+                self.after(0, lambda: self._update_progress(pct, msg))
+
+            dl_url = self.update_info.get("download_url", "")
+            h_url = self.update_info.get("html_url", "")
+            ok, msg = download_and_apply_update(dl_url, html_url=h_url, progress_callback=prog_cb)
+            self.after(0, lambda: self._on_update_done(ok, msg))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _update_progress(self, pct: float, msg: str) -> None:
+        self.progress_bar.set(pct)
+        self.progress_label.configure(text=msg)
+
+    def _on_update_done(self, ok: bool, msg: str) -> None:
+        if ok:
+            messagebox.showinfo("Pembaruan Berhasil", msg)
+            self.destroy()
+        else:
+            messagebox.showerror("Gagal Memperbarui", msg)
+            self.btn_later.configure(state="normal")
+            self.btn_github.configure(state="normal")
+            self.btn_update.configure(state="normal", text="Coba Update Lagi")
+            self.progress_frame.pack_forget()
 
 def get_col_letter(idx: int) -> str:
     result = ""

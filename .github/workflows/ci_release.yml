@@ -67,20 +67,30 @@ jobs:
               f.write(f"zip_name={zip_name}\n")
               f.write(f"zip_path={zip_path}\n")
 
+          latest_entry = FEATURE_REGISTRY[-1]
+          ver = latest_entry.get("version", __version__)
+          desc = latest_entry.get("description", latest_entry.get("title", ""))
+          highlights = latest_entry.get("highlights", [])
+
           notes = [
-              f"## VoterMail Engine v{__version__} — Portable Windows Edition (.EXE)",
-              f"**Developed by:** {__author__} ([Repository]({__repository__}))\n",
-              "### Cara Penggunaan (Tanpa Instalasi Python):",
-              "1. Unduh file **`.zip`** pada bagian **Assets** di bawah.",
+              f"## VoterMail Engine v{ver} — Portable Windows Edition (.EXE)",
+              f"**Dikembangkan oleh:** {__author__} ([Repositori Resmi]({__repository__}))\n",
+              f"### Apa yang Baru di Versi v{ver}:",
+          ]
+          if highlights:
+              for item in highlights:
+                  notes.append(f"- {item}")
+          else:
+              for part in [p.strip() for p in desc.split(",") if p.strip()]:
+                  notes.append(f"- {part[0].upper() + part[1:]}")
+
+          notes.extend([
+              "\n### Cara Penggunaan Baru / Update Manual:",
+              "1. Unduh file **`.zip`** pada bagian **Assets** di bawah (atau gunakan fitur **Update Otomatis** langsung dari dalam aplikasi).",
               "2. Ekstrak folder ke komputer Anda.",
               "3. Letakkan file Word Surat Panggilan dan Excel DPT di dalam folder `data/templates/`.",
-              "4. Klik 2x **`VoterMail_Engine.exe`** untuk langsung menjalankan aplikasi.\n",
-              "### Riwayat Pembaruan Fitur (Changelog):"
-          ]
-          for item in FEATURE_REGISTRY:
-              ver = item.get("version", "")
-              desc = item.get("description", item.get("title", ""))
-              notes.append(f"- **v{ver}**: {desc}")
+              "4. Klik 2x **`VoterMail_Engine.exe`** untuk menjalankan aplikasi."
+          ])
 
           Path("RELEASE_NOTES.md").write_text("\n".join(notes), encoding="utf-8")
           print(f"Prepared metadata for v{__version__} -> {zip_path}")

@@ -1,6 +1,9 @@
 # VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
 # Created by Danang Satria (https://github.com/Smurffahh/votermail-engine)
 
+import re
+from typing import Any
+
 __app_name__ = "VoterMail Engine"
 __author__ = "Danang Satria"
 __github_user__ = "Smurffahh"
@@ -8,7 +11,12 @@ __repository__ = "https://github.com/Smurffahh/votermail-engine"
 __copyright__ = "Copyright (c) 2026 Danang Satria"
 __license__ = "MIT License — Official Civic Automation Tool"
 
-FEATURE_REGISTRY: list[dict[str, str]] = [
+def parse_version_tuple(version_str: str) -> tuple[int, ...]:
+    cleaned = re.sub(r"^[^\d]*", "", str(version_str or "").strip())
+    parts = [int(p) for p in re.findall(r"\d+", cleaned)]
+    return tuple(parts) if parts else (0, 0, 0)
+
+FEATURE_REGISTRY: list[dict[str, Any]] = [
     {
         "version": "1.0.0",
         "date": "2026-11-10",
@@ -99,7 +107,29 @@ FEATURE_REGISTRY: list[dict[str, str]] = [
         "title": "Cetak Ulang Selektif (Filter Nomor Urut, RT, & Nama Pemilih)",
         "description": "Penambahan fitur Cetak Ulang Selektif (Filter Nomor Urut DPT, Filter per RT, dan Pencarian Nama Pemilih) dengan sinkronisasi pratinjau real-time dan penamaan PDF aman.",
     },
+    {
+        "version": "1.10.0",
+        "date": "2026-11-18",
+        "title": "Single-Version Release Notes & Auto-Updater dengan Opsi Update Nanti",
+        "description": "Penyederhanaan catatan rilis GitHub ke versi terbaru, penambahan auto-update checker saat startup dengan modal notifikasi dan opsi tunda, serta penginstal update otomatis yang menjaga keamanan file pengguna di folder data/.",
+        "highlights": [
+            "Penyederhanaan catatan GitHub Releases agar hanya menampilkan daftar pembaruan pada versi terbaru.",
+            "Penambahan fitur Auto-Update Checker saat aplikasi dibuka dengan pop-up notifikasi pembaruan dan opsi 'Update Sekarang' atau 'Nanti Saja'.",
+            "Penambahan mekanisme pengunduh & pemasang pembaruan otomatis (.EXE & Git) yang menjaga keamanan file data pemilih di folder data/.",
+        ],
+    },
 ]
+
+def get_latest_release_entry() -> dict[str, Any]:
+    if FEATURE_REGISTRY:
+        return FEATURE_REGISTRY[-1]
+    return {
+        "version": "1.0.0",
+        "date": "2026-11-10",
+        "title": "Rilis Awal Engine Mail-Merge",
+        "description": "Rilis awal engine Mail-Merge Word COM & Excel DPT per Kadus/RW.",
+        "highlights": [],
+    }
 
 def get_current_version() -> str:
     if FEATURE_REGISTRY:

@@ -1032,5 +1032,132 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(build_filter_filename_suffix(FILTER_MODE_RT, "003"), "_RT_003")
         self.assertEqual(build_filter_filename_suffix(FILTER_MODE_NAME, "Ade"), "_FILTER_NAMA_ADE")
 
+    def test_28_updater_version_parsing_and_release_notes(self) -> None:
+        from app.config.version import (
+            parse_version_tuple,
+            get_latest_release_entry,
+            __version__,
+        )
+
+        self.assertEqual(parse_version_tuple("v1.10.0"), (1, 10, 0))
+        self.assertEqual(parse_version_tuple("1.9.0"), (1, 9, 0))
+        self.assertTrue(parse_version_tuple("1.10.0") > parse_version_tuple("1.9.0"))
+        self.assertTrue(parse_version_tuple("v2.0.0") > parse_version_tuple("1.10.0"))
+        self.assertEqual(parse_version_tuple("1.10.0"), parse_version_tuple("v1.10.0"))
+        self.assertEqual(parse_version_tuple(""), (0, 0, 0))
+
+        latest = get_latest_release_entry()
+        self.assertEqual(latest.get("version"), "1.10.0")
+        self.assertIn("highlights", latest)
+        self.assertGreater(len(latest["highlights"]), 0)
+
+    def test_29_updater_url_validation_and_security(self) -> None:
+        from app.core.updater import validate_update_url
+
+        # Valid HTTPS official URLs
+        self.assertTrue(
+            validate_update_url("https://github.com/Smurffahh/votermail-engine/releases/download/v1.10.0/VoterMail_Engine_v1.10.0_Windows_x64_Portable.zip")
+        )
+        self.assertTrue(
+            validate_update_url("https://objects.githubusercontent.com/github-production-release-asset-2e65be/12345/VoterMail_Engine.zip")
+        )
+        self.assertTrue(
+            validate_update_url("https://api.github.com/repos/Smurffahh/votermail-engine/releases/latest")
+        )
+
+        # Invalid or untrusted URLs
+        self.assertFalse(validate_update_url("http://github.com/Smurffahh/votermail-engine/releases/latest"))
+        self.assertFalse(validate_update_url("https://evil.com/malicious.zip"))
+        self.assertFalse(validate_update_url("https://github.com/attacker/malicious-repo/releases/latest"))
+        self.assertFalse(validate_update_url(""))
+        self.assertFalse(validate_update_url(None))
+
+    def test_30_safe_zip_extraction(self) -> None:
+        import tempfile
+        import zipfile
+        from app.core.updater import safe_extract_zip
+
+        temp_dir = Path(tempfile.mkdtemp(prefix="test_zip_"))
+        try:
+            valid_zip = temp_dir / "valid.zip"
+            with zipfile.ZipFile(valid_zip, "w") as zf:
+                zf.writestr("test_file.txt", "isi valid")
+                zf.writestr("subfolder/inner.txt", "isi inner")
+
+            target_dir = temp_dir / "extracted"
+            extracted = safe_extract_zip(valid_zip, target_dir)
+            self.assertEqual(len(extracted), 2)
+            self.assertTrue((target_dir / "test_file.txt").exists())
+            self.assertTrue((target_dir / "subfolder" / "inner.txt").exists())
+            self.assertEqual((target_dir / "test_file.txt").read_text(encoding="utf-8"), "isi valid")
+
+            # Zip Slip exploit prevention test
+            slip_zip = temp_dir / "slip.zip"
+            with zipfile.ZipFile(slip_zip, "w") as zf:
+                zf.writestr("../evil.txt", "muatan berbahaya")
+
+            with self.assertRaises(PermissionError):
+                safe_extract_zip(slip_zip, target_dir)
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def test_31_check_for_updates_mock(self) -> None:
+        import json
+        from unittest.mock import patch, MagicMock
+        from app.core.updater import check_for_updates
+
+        # Scenario 1: New version available
+        mock_payload = {
+            "tag_name": "v2.0.0",
+            "name": "VoterMail Engine v2.0.0",
+            "body": "- Fitur baru besar",
+            "html_url": "https://github.com/Smurffahh/votermail-engine/releases/tag/v2.0.0",
+            "published_at": "2026-11-20T10:00:00Z",
+            "assets": [
+                {
+                    "name": "VoterMail_Engine_v2.0.0_Windows_x64_Portable.zip",
+                    "browser_download_url": "https://github.com/Smurffahh/votermail-engine/releases/download/v2.0.0/VoterMail_Engine_v2.0.0_Windows_x64_Portable.zip",
+                }
+            ],
+        }
+
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.read.return_value = json.dumps(mock_payload).encode("utf-8")
+        mock_resp.__enter__.return_value = mock_resp
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            res = check_for_updates(current_version="1.10.0")
+            self.assertTrue(res["update_available"])
+            self.assertEqual(res["latest_version"], "2.0.0")
+            self.assertEqual(
+                res["download_url"],
+                "https://github.com/Smurffahh/votermail-engine/releases/download/v2.0.0/VoterMail_Engine_v2.0.0_Windows_x64_Portable.zip",
+            )
+            self.assertIsNone(res["error"])
+
+        # Scenario 2: Already latest version
+        mock_payload_same = {
+            "tag_name": "v1.10.0",
+            "name": "VoterMail Engine v1.10.0",
+            "body": "Versi stabil saat ini",
+            "assets": [],
+        }
+        mock_resp_same = MagicMock()
+        mock_resp_same.status = 200
+        mock_resp_same.read.return_value = json.dumps(mock_payload_same).encode("utf-8")
+        mock_resp_same.__enter__.return_value = mock_resp_same
+
+        with patch("urllib.request.urlopen", return_value=mock_resp_same):
+            res_same = check_for_updates(current_version="1.10.0")
+            self.assertFalse(res_same["update_available"])
+
+        # Scenario 3: Offline / Network timeout
+        import urllib.error
+        with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("Connection timed out")):
+            res_err = check_for_updates(current_version="1.10.0")
+            self.assertFalse(res_err["update_available"])
+            self.assertIsNotNone(res_err["error"])
+
 if __name__ == "__main__":
     unittest.main()

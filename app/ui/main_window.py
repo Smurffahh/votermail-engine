@@ -78,6 +78,7 @@ from app.ui.components import (
     StatusBadge,
     AboutModal,
     ColumnMapperModal,
+    UpdateNotificationModal,
     apply_window_icon,
 )
 
@@ -146,6 +147,10 @@ class MainWindow(ctk.CTk):
             self.after(300, self._run_word_check)
         if self.cfg.excel_path and os.path.exists(self.cfg.excel_path):
             self.after(600, self._run_excel_scan)
+
+        self.latest_update_info: dict[str, Any] | None = None
+        self.has_shown_startup_update_modal = False
+        self.after(1200, self._start_startup_update_check)
 
         self.after(3000, self._check_external_file_changes)
         self.protocol("WM_DELETE_WINDOW", self._on_close_window)
@@ -235,6 +240,18 @@ class MainWindow(ctk.CTk):
         )
         self.theme_segment.set(current_val)
         self.theme_segment.pack(side="left", padx=(0, 10))
+
+        self.btn_update_header = ctk.CTkButton(
+            header_right,
+            text="⬆ Update Tersedia",
+            command=self._open_update_modal,
+            fg_color="#10B981",
+            hover_color="#059669",
+            text_color="#FFFFFF",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            height=32,
+            corner_radius=8,
+        )
 
         self.btn_about = ctk.CTkButton(
             header_right,
@@ -1635,3 +1652,31 @@ class MainWindow(ctk.CTk):
 
     def _open_about_modal(self) -> None:
         AboutModal(self, self.theme)
+
+    def _start_startup_update_check(self) -> None:
+        def check_worker() -> None:
+            from app.core.updater import check_for_updates
+            info = check_for_updates(__version__, timeout=5.0)
+            self.after(0, self._on_update_check_finished, info)
+
+        threading.Thread(target=check_worker, daemon=True).start()
+
+    def _on_update_check_finished(self, info: dict[str, Any]) -> None:
+        if info.get("update_available"):
+            self.latest_update_info = info
+            latest_v = info.get("latest_version", "")
+            self.btn_update_header.configure(text=f"⬆ Update v{latest_v}")
+            try:
+                self.btn_update_header.pack(side="left", padx=(0, 10), before=self.btn_about)
+            except Exception:
+                self.btn_update_header.pack(side="left", padx=(0, 10))
+
+            if not self.has_shown_startup_update_modal:
+                self.has_shown_startup_update_modal = True
+                UpdateNotificationModal(self, self.theme, info)
+
+    def _open_update_modal(self) -> None:
+        if self.latest_update_info:
+            UpdateNotificationModal(self, self.theme, self.latest_update_info)
+        else:
+            self._start_startup_update_check()

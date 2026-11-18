@@ -26,7 +26,7 @@ def bump_version(new_version: str, title: str, description: str, release_date: s
 
     content = VERSION_FILE.read_text(encoding="utf-8")
 
-    registry_pattern = r"(FEATURE_REGISTRY:\s*list\[dict\[str,\s*str\]\]\s*=\s*\[)([\s\S]*?)(\n\])"
+    registry_pattern = r"(FEATURE_REGISTRY:\s*list\[dict\[str,\s*(?:str|Any)\]\]\s*=\s*\[)([\s\S]*?)(\n\])"
     match = re.search(registry_pattern, content)
     if not match:
         raise RuntimeError("FEATURE_REGISTRY tidak ditemukan di app/config/version.py")
