@@ -13,8 +13,16 @@ from pydantic import BaseModel, Field
 
 if getattr(sys, "frozen", False):
     BASE_DIR = Path(sys.executable).resolve().parent
+    BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", BASE_DIR))
+    if not (BUNDLE_DIR / "app" / "assets" / "votermail.ico").exists() and (BASE_DIR / "app" / "assets" / "votermail.ico").exists():
+        BUNDLE_DIR = BASE_DIR
 else:
     BASE_DIR = Path(__file__).resolve().parent.parent.parent
+    BUNDLE_DIR = BASE_DIR
+
+ASSETS_DIR = BUNDLE_DIR / "app" / "assets"
+APP_ICON_ICO = ASSETS_DIR / "votermail.ico"
+APP_ICON_PNG = ASSETS_DIR / "votermail.png"
 
 DATA_DIR = BASE_DIR / "data"
 TEMPLATES_DIR = DATA_DIR / "templates"

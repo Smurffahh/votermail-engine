@@ -17,6 +17,8 @@ data/output/*
 !data/output/.gitkeep
 *.pdf
 *.png
+!app/assets/*.png
+!app/assets/*.ico
 
 # Temporary Staged Documents & Working Directories
 data/temp/*

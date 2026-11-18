@@ -12,6 +12,7 @@ import webbrowser
 from tkinter import messagebox
 import customtkinter as ctk
 
+from app.config.settings import APP_ICON_ICO, APP_ICON_PNG
 from app.config.theme import THEME, ThemeTokens
 from app.config.version import (
     __app_name__,
@@ -23,6 +24,28 @@ from app.config.version import (
     FEATURE_REGISTRY,
 )
 from app.core.excel_scanner import VoterData, is_blocked_pii
+
+def apply_window_icon(window: Any) -> None:
+    if not APP_ICON_ICO.exists():
+        return
+
+    icon_str = str(APP_ICON_ICO.resolve())
+
+    def _set_icon() -> None:
+        try:
+            if hasattr(window, "winfo_exists") and window.winfo_exists():
+                window.iconbitmap(icon_str)
+        except Exception:
+            pass
+
+    _set_icon()
+
+    if hasattr(window, "after"):
+        try:
+            window.after(220, _set_icon)
+            window.after(300, _set_icon)
+        except Exception:
+            pass
 
 class DocumentSourceRow(ctk.CTkFrame):
     """Komponen 2 baris rapi untuk sumber dokumen Word dan Excel dengan toolbar anti-clipping."""
@@ -619,6 +642,7 @@ class AboutModal(ctk.CTkToplevel):
         self.geometry("620x640")
         self.minsize(560, 500)
         self.configure(fg_color=THEME["bg_root"])
+        apply_window_icon(self)
 
         self.transient(master)
         self.grab_set()
@@ -654,6 +678,16 @@ class AboutModal(ctk.CTkToplevel):
 
         title_row = ctk.CTkFrame(header_frame, fg_color="transparent")
         title_row.pack(fill="x")
+
+        if APP_ICON_PNG.exists():
+            try:
+                from PIL import Image
+                logo_pil = Image.open(APP_ICON_PNG)
+                self.about_logo_img = ctk.CTkImage(light_image=logo_pil, dark_image=logo_pil, size=(36, 36))
+                icon_lbl = ctk.CTkLabel(title_row, image=self.about_logo_img, text="")
+                icon_lbl.pack(side="left", padx=(0, 10))
+            except Exception:
+                pass
 
         app_title = ctk.CTkLabel(
             title_row,
@@ -841,6 +875,7 @@ class ColumnMapperModal(ctk.CTkToplevel):
         self.geometry("540x590")
         self.resizable(False, False)
         self.configure(fg_color=THEME["bg_root"])
+        apply_window_icon(self)
         self.transient(parent)
         self.grab_set()
 

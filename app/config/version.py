@@ -75,6 +75,12 @@ FEATURE_REGISTRY: list[dict[str, str]] = [
         "title": "Fix Build docxcompose & Progres Bar Granular Real-Time",
         "description": "Perbaikan bug file template docxcompose yang hilang pada versi .EXE (Errno 2) dan penyempurnaan progress bar real-time untuk pemrosesan ribuan data.",
     },
+    {
+        "version": "1.8.2",
+        "date": "2026-11-18",
+        "title": "Ikon Resmi VoterMail Engine & Identitas Taskbar Windows",
+        "description": "Penambahan ikon resmi VoterMail Engine pada jendela utama, seluruh jendela pop-up (Tentang & Atur Kolom), Taskbar Windows, serta file executable (.EXE).",
+    },
 ]
 
 def get_current_version() -> str:

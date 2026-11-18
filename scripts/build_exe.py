@@ -23,6 +23,15 @@ from app.config.version import (
 BUILD_DIR = BASE_DIR / "build"
 DIST_DIR = BASE_DIR / "dist"
 PACKAGE_DIR = DIST_DIR / "VoterMail_Engine"
+ASSETS_DIR = BASE_DIR / "app" / "assets"
+ICON_ICO_PATH = ASSETS_DIR / "votermail.ico"
+ICON_PNG_PATH = ASSETS_DIR / "votermail.png"
+
+def ensure_assets() -> None:
+    if not ICON_ICO_PATH.exists() or not ICON_PNG_PATH.exists():
+        print("[*] Menghasilkan aset ikon aplikasi via scripts/generate_icon.py...")
+        from scripts.generate_icon import generate_votermail_icon
+        generate_votermail_icon(ASSETS_DIR)
 
 def clean_build_artifacts() -> None:
     print(f"[*] Membersihkan folder artefak lama (build/, dist/)...")
@@ -37,6 +46,7 @@ def clean_build_artifacts() -> None:
             pass
 
 def run_pyinstaller() -> None:
+    ensure_assets()
     print(f"[*] Menjalankan PyInstaller untuk merakit {__app_name__} v{__version__} (--onedir)...")
     cmd = [
         sys.executable,
@@ -47,6 +57,10 @@ def run_pyinstaller() -> None:
         "--windowed",
         "--noconfirm",
         "--clean",
+        "--icon",
+        str(ICON_ICO_PATH),
+        "--add-data",
+        f"{ASSETS_DIR}{os.pathsep}app/assets",
         "--collect-all=customtkinter",
         "--hidden-import=win32timezone",
         "--hidden-import=win32com",
@@ -93,6 +107,15 @@ def prepare_distribution_tree() -> None:
         if "karangjengkol" in lower or "surat panggilan.doc" in lower:
             item.unlink(missing_ok=True)
             raise RuntimeError(f"Pelanggaran keamanan: File riil {item.name} terdeteksi di dist! Proses dibatalkan.")
+
+    dist_assets = PACKAGE_DIR / "app" / "assets"
+    dist_assets.mkdir(parents=True, exist_ok=True)
+    if ICON_ICO_PATH.exists():
+        shutil.copy2(ICON_ICO_PATH, dist_assets / "votermail.ico")
+        print(f"  [+] Menyalin cadangan ikon aplikasi: {dist_assets / 'votermail.ico'}")
+    if ICON_PNG_PATH.exists():
+        shutil.copy2(ICON_PNG_PATH, dist_assets / "votermail.png")
+        print(f"  [+] Menyalin cadangan PNG logo aplikasi: {dist_assets / 'votermail.png'}")
 
     guide_path = PACKAGE_DIR / "PANDUAN_PANITIA.txt"
     guide_content = f"""================================================================================

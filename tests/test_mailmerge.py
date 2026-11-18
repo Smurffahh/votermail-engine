@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shutil
 import sys
+from typing import Any, Callable
 import unittest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -781,6 +782,47 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertTrue(res_custom_word.is_valid)
         self.assertFalse(res_custom_word.is_standard_format)
         self.assertTrue(res_custom_word.format_status_text.startswith("• Format Kustom Terdeteksi"))
+
+    def test_24_application_assets_and_icon_helper(self) -> None:
+        from app.config.settings import APP_ICON_ICO, APP_ICON_PNG
+        from app.ui.components import apply_window_icon
+
+        self.assertTrue(APP_ICON_ICO.exists(), f"APP_ICON_ICO harus ada di {APP_ICON_ICO}")
+        self.assertGreater(APP_ICON_ICO.stat().st_size, 0, "Ukuran APP_ICON_ICO harus > 0 bytes")
+
+        self.assertTrue(APP_ICON_PNG.exists(), f"APP_ICON_PNG harus ada di {APP_ICON_PNG}")
+        self.assertGreater(APP_ICON_PNG.stat().st_size, 0, "Ukuran APP_ICON_PNG harus > 0 bytes")
+
+        class MockWindow:
+            def __init__(self) -> None:
+                self.icon_calls: list[str] = []
+                self.scheduled_calls: list[tuple[int, Any]] = []
+
+            def iconbitmap(self, path: str) -> None:
+                self.icon_calls.append(path)
+
+            def winfo_exists(self) -> bool:
+                return True
+
+            def after(self, ms: int, fn: Any) -> None:
+                self.scheduled_calls.append((ms, fn))
+
+        mock = MockWindow()
+        apply_window_icon(mock)
+
+        self.assertEqual(len(mock.icon_calls), 1)
+        self.assertEqual(mock.icon_calls[0], str(APP_ICON_ICO.resolve()))
+        self.assertEqual(len(mock.scheduled_calls), 2)
+        self.assertEqual(mock.scheduled_calls[0][0], 220)
+        self.assertEqual(mock.scheduled_calls[1][0], 300)
+
+        for _, cb in mock.scheduled_calls:
+            cb()
+        self.assertEqual(len(mock.icon_calls), 3)
+
+        # Test robustness against non-Tk objects
+        apply_window_icon(None)
+        apply_window_icon(object())
 
 if __name__ == "__main__":
     unittest.main()

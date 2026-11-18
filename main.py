@@ -126,6 +126,14 @@ def ensure_dependencies() -> None:
 
 def main() -> None:
     ensure_dependencies()
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                "danangsatria.votermail.engine"
+            )
+        except Exception:
+            pass
     from app.ui.main_window import MainWindow
 
     app = MainWindow()

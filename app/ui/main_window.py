@@ -68,11 +68,22 @@ from app.ui.components import (
     StatusBadge,
     AboutModal,
     ColumnMapperModal,
+    apply_window_icon,
 )
 
 class MainWindow(ctk.CTk):
     def __init__(self) -> None:
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                    "danangsatria.votermail.engine"
+                )
+            except Exception:
+                pass
+
         super().__init__()
+        apply_window_icon(self)
 
         self.cfg: AppConfig = load_app_config()
         self.theme: ThemeTokens = get_theme(self.cfg.theme_mode)
