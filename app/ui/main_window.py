@@ -11,10 +11,10 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Any
+from typing import Any, Literal
 import webbrowser
 import customtkinter as ctk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 
 from app.config.settings import (
     AppConfig,
@@ -61,7 +61,12 @@ from app.core.pdf_verifier import (
     export_audit_excel,
     verify_kadus_pdf,
 )
-from app.core.security import sanitize_filename, to_win_abs_path, validate_safe_output_path
+from app.core.security import (
+    sanitize_filename,
+    to_win_abs_path,
+    validate_safe_output_path,
+    translate_exception_to_user_message,
+)
 from app.core.word_preparer import (
     WordCheckResult,
     WordSnapshot,
@@ -79,6 +84,8 @@ from app.ui.components import (
     AboutModal,
     ColumnMapperModal,
     UpdateNotificationModal,
+    ModernNotificationModal,
+    InAppToastBanner,
     apply_window_icon,
 )
 
@@ -164,12 +171,26 @@ class MainWindow(ctk.CTk):
 
     def _on_close_window(self) -> None:
         if self.is_processing:
-            if not messagebox.askyesno(
-                "Konfirmasi Keluar",
-                "Proses pembuatan dokumen sedang berjalan di latar belakang.\n\nApakah Anda yakin ingin membatalkan proses dan menutup aplikasi?",
-            ):
-                return
-            self.cancel_event.set()
+            def do_exit() -> None:
+                self.cancel_event.set()
+                try:
+                    clean_temp_dir()
+                except Exception:
+                    pass
+                self.destroy()
+
+            ModernNotificationModal(
+                parent=self,
+                variant="confirm",
+                title="Hentikan Proses & Keluar?",
+                summary="Proses pembuatan PDF sedang berjalan di latar belakang. Jika Anda keluar sekarang, berkas PDF yang sedang diproses tidak akan disimpan secara utuh.",
+                solution="Klik 'Lanjutkan Mencetak' untuk membiarkan proses selesai, atau klik 'Ya, Hentikan Proses' untuk membatalkan dan menutup aplikasi.",
+                primary_action_label="Ya, Hentikan Proses",
+                primary_action_callback=do_exit,
+                secondary_action_label="Lanjutkan Mencetak",
+                theme=self.theme,
+            )
+            return
 
         try:
             clean_temp_dir()
@@ -319,23 +340,35 @@ class MainWindow(ctk.CTk):
         lbl_footer_sec.pack(side="left")
         lbl_footer_sec.bind("<Button-1>", lambda _: webbrowser.open(__repository__))
 
+        # In-App Non-Intrusive Toast Banner
+        self.toast_banner = InAppToastBanner(self, theme=self.theme)
+
         # Main Workspace Container: 2-Column Responsive Layout without nested outer scrollbars
-        main_body = ctk.CTkFrame(self, fg_color=THEME["bg_root"])
-        main_body.pack(fill="both", expand=True, padx=14, pady=(10, 6))
+        self.main_body = ctk.CTkFrame(self, fg_color=THEME["bg_root"])
+        self.main_body.pack(fill="both", expand=True, padx=14, pady=(10, 6))
 
         # Left Column (approx 46% width): Source Preparation & Kadus Selection
-        self.left_col = ctk.CTkFrame(main_body, fg_color="transparent", width=590)
+        self.left_col = ctk.CTkFrame(self.main_body, fg_color="transparent", width=590)
         self.left_col.pack(side="left", fill="both", expand=False, padx=(0, 10))
         self.left_col.pack_propagate(False)
 
         # Right Column (approx 54% width): Output Settings, Mailing Engine, Live Logs & Preview Table
-        self.right_col = ctk.CTkFrame(main_body, fg_color="transparent")
+        self.right_col = ctk.CTkFrame(self.main_body, fg_color="transparent")
         self.right_col.pack(side="right", fill="both", expand=True)
 
         self._build_card_sources(self.left_col)
         self._build_card_kadus(self.left_col)
         self._build_card_exec(self.right_col)
         self._build_card_activity(self.right_col)
+
+    def show_toast(
+        self,
+        message: str,
+        variant: Literal["success", "info", "warning"] = "success",
+        duration_ms: int = 3500,
+    ) -> None:
+        if hasattr(self, "toast_banner"):
+            self.toast_banner.show(message, variant=variant, duration_ms=duration_ms, before_widget=self.main_body)
 
     def _build_card_sources(self, parent: ctk.CTkFrame) -> None:
         self.card_sources = ctk.CTkFrame(
@@ -842,14 +875,26 @@ class MainWindow(ctk.CTk):
             try:
                 os.startfile(folder)
             except Exception as exc:
-                messagebox.showerror(
-                    "Gagal Membuka Folder",
-                    f"Tidak dapat membuka folder hasil.\n\nPenyebab: {exc}\n\nSolusi: Pastikan path folder valid dan dapat diakses.",
+                err_dict = translate_exception_to_user_message(exc, context_label="Folder Hasil PDF")
+                ModernNotificationModal(
+                    parent=self,
+                    variant="error",
+                    title="Gagal Membuka Folder",
+                    summary=err_dict["summary"],
+                    solution=err_dict["solution"],
+                    technical_detail=err_dict["technical_detail"],
+                    primary_action_label="Mengerti & Tutup",
+                    theme=self.theme,
                 )
         else:
-            messagebox.showinfo(
-                "Folder Belum Tersedia",
-                "Folder penyimpanan PDF belum dibuat di komputer Anda. Folder akan dibuat otomatis saat pratinjau atau proses cetak dimulai.",
+            ModernNotificationModal(
+                parent=self,
+                variant="warning",
+                title="Folder Belum Tersedia",
+                summary="Folder penyimpanan PDF belum dibuat di komputer Anda.",
+                solution="Folder akan dibuat secara otomatis saat proses pembuatan surat PDF dimulai.",
+                primary_action_label="Mengerti & Tutup",
+                theme=self.theme,
             )
 
     def _save_active_config(self) -> None:
@@ -866,6 +911,7 @@ class MainWindow(ctk.CTk):
         self._save_active_config()
         self.voter_table.update_address_format(val)
         self._on_filter_changed()
+        self.show_toast(f"Format alamat diperbarui: '{val}'", variant="success")
         self._log(f"[PENGATURAN] Format alamat diubah: {val}")
 
     def _on_filter_mode_changed(self, mode: str) -> None:
@@ -895,6 +941,7 @@ class MainWindow(ctk.CTk):
             placeholder_text="Semua pemilih dalam Kadus terpilih akan dicetak",
         )
         self._on_filter_changed()
+        self.show_toast("Filter pemilih di-reset ke Semua Pemilih", variant="info")
 
     def _on_filter_key_release(self, event: Any = None) -> None:
         if hasattr(self, "_filter_debounce_id") and self._filter_debounce_id:
@@ -1129,15 +1176,21 @@ class MainWindow(ctk.CTk):
 
     def _open_column_mapper(self) -> None:
         if not self.excel_scan_result or not self.excel_scan_result.available_columns:
-            messagebox.showinfo(
-                "Pilih Berkas DPT",
-                "Pilih dan scan berkas Excel DPT terlebih dahulu agar aplikasi dapat membaca daftar kolom yang tersedia.",
+            ModernNotificationModal(
+                parent=self,
+                variant="warning",
+                title="Pilih Berkas Excel DPT",
+                summary="Aplikasi belum memindai daftar kolom dari berkas Excel DPT.",
+                solution="Pilih berkas Excel DPT yang valid pada kartu '1. Sumber Dokumen' terlebih dahulu.",
+                primary_action_label="Mengerti & Tutup",
+                theme=self.theme,
             )
             return
 
         def on_applied(new_mapping: dict[str, int]) -> None:
             self.custom_column_map = new_mapping
             self._log(f"[KOLOM DPT] Pemetaan kolom manual diterapkan: {new_mapping}")
+            self.show_toast("✓ Pemetaan kolom manual berhasil disimpan dan diterapkan.", variant="success")
             self._run_excel_scan()
 
         hdr_idx = self.excel_scan_result.sheet_summaries[0].header_row_index if self.excel_scan_result.sheet_summaries else 0
@@ -1340,9 +1393,14 @@ class MainWindow(ctk.CTk):
 
     def _generate_preview(self) -> None:
         if not self.word_check_result or not self.word_check_result.is_valid:
-            messagebox.showwarning(
-                "Template Belum Siap",
-                "Periksa template Word terlebih dahulu dengan menekan tombol 'Cek Ulang' di kartu 1 sebelum melakukan pratinjau.",
+            ModernNotificationModal(
+                parent=self,
+                variant="warning",
+                title="Template Word Belum Siap",
+                summary="Template Word belum diperiksa atau strukturnya belum valid.",
+                solution="Tekan tombol 'Cek Ulang' di kartu '1. Sumber Dokumen' terlebih dahulu sebelum membuat pratinjau.",
+                primary_action_label="Mengerti & Tutup",
+                theme=self.theme,
             )
             return
 
@@ -1376,14 +1434,18 @@ class MainWindow(ctk.CTk):
                 os.startfile(final_pdf)
             except Exception:
                 pass
-            messagebox.showinfo(
-                "Pratinjau Berhasil",
-                f"Berkas pratinjau 1 lembar berhasil dibuat dan disimpan di:\n{final_pdf}",
-            )
+            self.show_toast("✓ Berkas pratinjau 1 lembar berhasil dibuat dan dibuka.", variant="success")
         else:
-            messagebox.showerror(
-                "Gagal Membuat Pratinjau",
-                f"Gagal membuat pratinjau surat melalui Microsoft Word.\n\nPenyebab: {msg}\n\nSolusi: Pastikan Microsoft Word terinstal dan tidak ada dialog Word yang terbuka.",
+            err_dict = translate_exception_to_user_message(Exception(msg), context_label="Pratinjau Surat")
+            ModernNotificationModal(
+                parent=self,
+                variant="error",
+                title="Gagal Membuat Pratinjau",
+                summary=err_dict["summary"],
+                solution=err_dict["solution"],
+                technical_detail=err_dict["technical_detail"],
+                primary_action_label="Mengerti & Tutup",
+                theme=self.theme,
             )
 
     def _start_mailing_process(self) -> None:
@@ -1395,9 +1457,16 @@ class MainWindow(ctk.CTk):
             if s.sheet_name in self.kadus_rows and self.kadus_rows[s.sheet_name].checkbox_var.get()
         ]
         if not selected_sheets:
-            messagebox.showwarning(
-                "Pilih Wilayah Cetak",
-                "Pilih minimal 1 wilayah Kadus / RW pada kartu 2 untuk mulai mencetak surat panggilan.",
+            ModernNotificationModal(
+                parent=self,
+                variant="warning",
+                title="Belum Ada Wilayah Dipilih",
+                summary="Tidak ada Kadus / RW yang dicentang untuk dicetak.",
+                solution="Centang minimal satu wilayah pada kartu '2. Pilih Wilayah (Kadus/RW)' sebelum memulai pencetakan.",
+                primary_action_label="Pilih Semua Wilayah",
+                primary_action_callback=self._select_all_sheets,
+                secondary_action_label="Pilih Nanti",
+                theme=self.theme,
             )
             return
 
@@ -1417,9 +1486,16 @@ class MainWindow(ctk.CTk):
                 sheets_data.append((s, s.voters))
 
         if not sheets_data:
-            messagebox.showwarning(
-                "Tidak Ada Pemilih Cocok",
-                "Tidak ada pemilih yang cocok dengan filter yang ditentukan pada Kadus terpilih.",
+            ModernNotificationModal(
+                parent=self,
+                variant="warning",
+                title="Tidak Ada Pemilih Ditemukan",
+                summary="Kriteria filter cetak yang dimasukkan tidak cocok dengan satupun data pemilih pada wilayah yang dipilih.",
+                solution="Periksa kembali nomor urut, nomor RT, atau ejaan nama pemilih, atau klik 'Reset Filter' untuk mencetak seluruh pemilih.",
+                primary_action_label="Reset Filter",
+                primary_action_callback=self._on_filter_reset,
+                secondary_action_label="Tutup",
+                theme=self.theme,
             )
             return
 
@@ -1517,15 +1593,22 @@ class MainWindow(ctk.CTk):
 
     def _cancel_mailing(self) -> None:
         if self.is_processing:
-            confirm = messagebox.askyesno(
-                "Hentikan Proses Cetak?",
-                "Proses pembuatan surat panggilan sedang berjalan. Jika dibatalkan sekarang, berkas PDF yang sedang diproses tidak akan disimpan secara utuh.\n\nApakah Anda yakin ingin membatalkan?",
+            def do_cancel() -> None:
+                self.cancel_event.set()
+                self._log("[BATAL] Mengirim sinyal pembatalan ke proses latar belakang...")
+                self.btn_cancel.configure(state="disabled", text="Membatalkan...")
+
+            ModernNotificationModal(
+                parent=self,
+                variant="confirm",
+                title="Hentikan Proses Pembuatan PDF?",
+                summary="Proses pembuatan surat panggilan sedang berjalan. Jika dibatalkan sekarang, berkas PDF yang sedang diproses tidak akan disimpan secara utuh.",
+                solution="Klik 'Lanjutkan Mencetak' untuk membiarkan proses selesai, atau klik 'Ya, Hentikan Proses' untuk menghentikan pembuatan dokumen.",
+                primary_action_label="Ya, Hentikan Proses",
+                primary_action_callback=do_cancel,
+                secondary_action_label="Lanjutkan Mencetak",
+                theme=self.theme,
             )
-            if not confirm:
-                return
-            self.cancel_event.set()
-            self._log("[BATAL] Mengirim sinyal pembatalan ke proses latar belakang...")
-            self.btn_cancel.configure(state="disabled", text="Membatalkan...")
 
     def _poll_worker_queue(self) -> None:
         if self.is_processing and self.start_process_time > 0:
@@ -1542,9 +1625,16 @@ class MainWindow(ctk.CTk):
                     self.word_ready = False
                     self.doc_row_word.set_status(f"Gagal: {payload}", "error")
                     self._log(f"[WORD ERROR] {payload}")
-                    messagebox.showerror(
-                        "Pemeriksaan Word Gagal",
-                        f"Gagal memeriksa template Word.\n\nPenyebab: {payload}\n\nSolusi: Pastikan berkas tidak terkunci oleh Microsoft Word atau aplikasi lain, lalu coba lagi.",
+                    err_dict = translate_exception_to_user_message(Exception(payload), context_label="Template Word")
+                    ModernNotificationModal(
+                        parent=self,
+                        variant="error",
+                        title=err_dict["title"],
+                        summary=err_dict["summary"],
+                        solution=err_dict["solution"],
+                        technical_detail=err_dict["technical_detail"],
+                        primary_action_label="Mengerti & Tutup",
+                        theme=self.theme,
                     )
                 elif msg_type == "excel_done":
                     self._apply_excel_results(payload)
@@ -1552,9 +1642,16 @@ class MainWindow(ctk.CTk):
                     self.excel_ready = False
                     self.doc_row_excel.set_status(f"Gagal: {payload}", "error")
                     self._log(f"[EXCEL ERROR] {payload}")
-                    messagebox.showerror(
-                        "Pemindaian Excel Gagal",
-                        f"Gagal membaca data Excel DPT.\n\nPenyebab: {payload}\n\nSolusi: Pastikan format berkas .xlsx atau .xlsm dan tidak sedang dibuka di aplikasi lain.",
+                    err_dict = translate_exception_to_user_message(Exception(payload), context_label="Excel DPT")
+                    ModernNotificationModal(
+                        parent=self,
+                        variant="error",
+                        title=err_dict["title"],
+                        summary=err_dict["summary"],
+                        solution=err_dict["solution"],
+                        technical_detail=err_dict["technical_detail"],
+                        primary_action_label="Mengerti & Tutup",
+                        theme=self.theme,
                     )
 
                 elif msg_type == "kadus_started":
@@ -1590,9 +1687,16 @@ class MainWindow(ctk.CTk):
                     self._on_process_finished()
                     self.time_label.configure(text=f"Waktu Berjalan: {format_elapsed_time(elapsed)} (Dihentikan)")
                     self._log(f"[ERROR] Gagal memproses {sheet_name}: {err}")
-                    messagebox.showerror(
-                        "Gagal Membuat PDF",
-                        f"Terjadi kesalahan saat memproses {sheet_name}.\n\nPenyebab: {err}\n\nSolusi: Pastikan Microsoft Word terinstal, tidak ada jendela Word yang menggantung, lalu coba lagi.",
+                    err_dict = translate_exception_to_user_message(Exception(err), context_label=f"Wilayah {sheet_name}")
+                    ModernNotificationModal(
+                        parent=self,
+                        variant="error",
+                        title=err_dict["title"],
+                        summary=err_dict["summary"],
+                        solution=err_dict["solution"],
+                        technical_detail=err_dict["technical_detail"],
+                        primary_action_label="Mengerti & Tutup",
+                        theme=self.theme,
                     )
 
                 elif msg_type == "verify_started":
@@ -1615,7 +1719,15 @@ class MainWindow(ctk.CTk):
                     self._on_process_finished()
                     self.time_label.configure(text=f"Waktu Berjalan: {format_elapsed_time(elapsed)} (Dihentikan)")
                     self._log(f"[BATAL] {payload}")
-                    messagebox.showinfo("Proses Dibatalkan", "Proses pembuatan surat panggilan telah dihentikan atas permintaan pengguna.")
+                    ModernNotificationModal(
+                        parent=self,
+                        variant="warning",
+                        title="Proses Dibatalkan",
+                        summary="Proses pembuatan surat panggilan telah dihentikan atas permintaan pengguna. Berkas sementara telah dibersihkan secara aman.",
+                        solution="Anda dapat memulai proses baru kapan saja dengan menekan tombol 'Mulai Buat Surat PDF'.",
+                        primary_action_label="Mengerti & Tutup",
+                        theme=self.theme,
+                    )
 
                 elif msg_type == "all_completed":
                     kadus_count, total_v = payload
@@ -1628,10 +1740,52 @@ class MainWindow(ctk.CTk):
                     )
                     self._log(f"[SELESAI 100%] Berhasil membuat {kadus_count} file PDF ({total_v:,} pemilih) dalam {format_elapsed_time(elapsed)}.")
                     clean_temp_dir()
-                    messagebox.showinfo(
-                        "Pembuatan Surat Selesai",
-                        f"Seluruh berkas surat panggilan ({kadus_count} Kadus, {total_v:,} pemilih) berhasil dibuat dan siap dicetak di folder:\n{self.output_entry.get()}"
+
+                    layout_mode = self.word_check_result.layout_mode if self.word_check_result else "2-UP"
+                    has_two_slots = (layout_mode == "2-UP")
+                    total_lembar = math.ceil(total_v / 2) if has_two_slots else total_v
+
+                    has_anomaly = any(
+                        "anomali" in row.status_label.cget("text").lower()
+                        for row in self.kadus_rows.values()
                     )
+
+                    if has_anomaly:
+                        ModernNotificationModal(
+                            parent=self,
+                            variant="warning",
+                            title="Surat Selesai dengan Catatan Verifikasi",
+                            summary=f"Sebanyak {kadus_count} file PDF berhasil dibuat, namun ditemukan selisih halaman atau anomali pada hasil pemeriksaan PDF.",
+                            solution="Periksa tab 'Hasil Cek PDF' untuk melihat rincian ketidaksesuaian jumlah halaman sebelum mencetak surat fisik.",
+                            info_box={
+                                "Wilayah Selesai": f"{kadus_count} Kadus",
+                                "Total Tercetak": f"{total_v:,} Surat ({total_lembar:,} Lembar F4)".replace(",", "."),
+                                "Waktu Berjalan": format_elapsed_time(elapsed),
+                                "Status Cek PDF": "Perlu Pemeriksaan Ulang (Ada Selisih)",
+                            },
+                            primary_action_label="Lihat Hasil Cek PDF",
+                            primary_action_callback=lambda: self.tabview.set("Hasil Cek PDF"),
+                            secondary_action_label="Buka Folder PDF",
+                            secondary_action_callback=self._open_output_dir,
+                            theme=self.theme,
+                        )
+                    else:
+                        ModernNotificationModal(
+                            parent=self,
+                            variant="success",
+                            title="Pembuatan Surat Selesai",
+                            summary=f"Seluruh berkas surat panggilan ({kadus_count} Kadus, {total_v:,} pemilih) berhasil dibuat dan diverifikasi siap cetak.".replace(",", "."),
+                            info_box={
+                                "Wilayah Selesai": f"{kadus_count} Kadus",
+                                "Total Tercetak": f"{total_v:,} Surat ({total_lembar:,} Lembar F4)".replace(",", "."),
+                                "Waktu Berjalan": format_elapsed_time(elapsed),
+                                "Status Cek PDF": "Lolos Verifikasi (100% Sesuai)",
+                            },
+                            primary_action_label="Buka Folder Hasil PDF",
+                            primary_action_callback=self._open_output_dir,
+                            secondary_action_label="Selesai",
+                            theme=self.theme,
+                        )
 
         except queue.Empty:
             pass

@@ -28,7 +28,7 @@ from app.config.settings import (
     FILTER_MODE_OPTIONS,
     DEFAULT_FILTER_MODE,
 )
-from app.core.security import sanitize_filename
+from app.core.security import sanitize_filename, sanitize_cell_text
 
 @dataclass
 class ExcelSnapshot:
@@ -751,7 +751,7 @@ def scan_and_validate_excel(
         rw_col = col_map.get("rw")
 
         for r_idx in range(data_start_row, len(df)):
-            row = [str(df.iloc[r_idx, c]).strip() for c in range(df.shape[1])]
+            row = [sanitize_cell_text(str(df.iloc[r_idx, c]).strip()) for c in range(df.shape[1])]
             no_val = row[no_col] if no_col is not None and no_col < len(row) else ""
             nama_val = row[nama_col] if nama_col is not None and nama_col < len(row) else ""
 

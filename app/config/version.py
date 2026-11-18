@@ -118,6 +118,18 @@ FEATURE_REGISTRY: list[dict[str, Any]] = [
             "Penambahan mekanisme pengunduh & pemasang pembaruan otomatis (.EXE & Git) yang menjaga keamanan file data pemilih di folder data/.",
         ],
     },
+    {
+        "version": "1.9.1",
+        "date": "2026-11-18",
+        "title": "Hardening Keamanan Template Word, Sanitasi Sel Excel, & Modern Notification System",
+        "description": "Penguatan keamanan template Word (Jinja2 Tag Guard) & sanitasi sel Excel, penerjemah error ramah pengguna (Zero Stack-Trace Leak), serta penggantian seluruh pop-up bawaan Windows dengan sistem Modern Notification Modal & Ringkasan Selesai Cetak.",
+        "highlights": [
+            "Penerapan Jinja2 Template Tag Whitelist pada dokumen Word untuk mencegah eksploitasi Server/Client-Side Template Injection.",
+            "Sanitasi otomatis error rumus Excel (#REF!, #VALUE!, #N/A) dan pembatasan panjang sel 250 karakter untuk mencegah MS Word membeku.",
+            "Penerjemah error terpusat (Zero Stack-Trace Leak) yang menyajikan panduan Apa + Mengapa + Solusi konkret tanpa path internal mentah.",
+            "Penggantian 100% tkinter.messagebox dengan ModernNotificationModal (Success, Warning, Error, Confirm) dan InAppToastBanner.",
+        ],
+    },
 ]
 
 def get_latest_release_entry() -> dict[str, Any]:

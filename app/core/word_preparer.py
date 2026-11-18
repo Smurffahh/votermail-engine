@@ -18,7 +18,7 @@ import pythoncom
 import win32com.client
 
 from app.config.settings import TEMP_DIR
-from app.core.security import to_win_abs_path
+from app.core.security import to_win_abs_path, validate_safe_template_tags
 
 @dataclass
 class WordSnapshot:
@@ -371,6 +371,14 @@ def check_and_prepare_word_template(
 
     initial_text = " ".join(p.text for p in iter_all_paragraphs(doc))
     initial_lower = initial_text.lower()
+
+    is_safe_tag, tag_err = validate_safe_template_tags(initial_text)
+    if not is_safe_tag:
+        result.is_valid = False
+        result.status_badge = "Perlu Perbaikan"
+        result.message = tag_err
+        result.issues.append(tag_err)
+        return result
 
     has_slot1_tags = "{{nama_1}}" in initial_text or "{{nomor_1}}" in initial_text
     has_slot2_tags = "{{nama_2}}" in initial_text or "{{nomor_2}}" in initial_text

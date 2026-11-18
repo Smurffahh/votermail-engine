@@ -10,7 +10,6 @@ import sys
 import threading
 from typing import Any, Callable, Literal
 import webbrowser
-from tkinter import messagebox
 import customtkinter as ctk
 
 from app.config.settings import APP_ICON_ICO, APP_ICON_PNG, DEFAULT_ADDRESS_FORMAT
@@ -47,6 +46,464 @@ def apply_window_icon(window: Any) -> None:
             window.after(300, _set_icon)
         except Exception:
             pass
+
+class InAppToastBanner(ctk.CTkFrame):
+    def __init__(self, parent: Any, theme: ThemeTokens | None = None, **kwargs: Any) -> None:
+        self.theme = theme or ThemeTokens()
+        super().__init__(
+            parent,
+            fg_color=THEME["status_ready_bg"],
+            border_color=THEME["status_ready_text"],
+            border_width=1,
+            corner_radius=self.theme.corner_radius_control,
+            **kwargs,
+        )
+        self.parent = parent
+        self._timer_id: str | None = None
+
+        self.label_icon = ctk.CTkLabel(
+            self,
+            text="✓",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=12, weight="bold"),
+            text_color=THEME["status_ready_text"],
+            width=24,
+        )
+        self.label_icon.pack(side="left", padx=(10, 4), pady=6)
+
+        self.label_msg = ctk.CTkLabel(
+            self,
+            text="",
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            text_color=THEME["text_primary"],
+            anchor="w",
+            justify="left",
+        )
+        self.label_msg.pack(side="left", fill="x", expand=True, padx=(0, 8), pady=6)
+
+        self.btn_close = ctk.CTkButton(
+            self,
+            text="✕",
+            width=22,
+            height=22,
+            fg_color="transparent",
+            hover_color=THEME["bg_hover"],
+            text_color=THEME["text_secondary"],
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
+            corner_radius=4,
+            command=self.hide,
+        )
+        self.btn_close.pack(side="right", padx=(0, 8), pady=6)
+
+    def show(
+        self,
+        message: str,
+        variant: Literal["success", "info", "warning"] = "success",
+        duration_ms: int = 3500,
+        before_widget: Any = None,
+    ) -> None:
+        if self._timer_id:
+            try:
+                self.after_cancel(self._timer_id)
+            except Exception:
+                pass
+            self._timer_id = None
+
+        if variant == "success":
+            icon = "✓"
+            bg = THEME["status_ready_bg"]
+            border = THEME["status_ready_text"]
+            fg = THEME["status_ready_text"]
+        elif variant == "warning":
+            icon = "⚠"
+            bg = THEME["status_warn_bg"]
+            border = THEME["status_warn_text"]
+            fg = THEME["status_warn_text"]
+        else:
+            icon = "ℹ"
+            bg = THEME["btn_accent_soft_bg"]
+            border = THEME["btn_accent_soft_border"]
+            fg = THEME["btn_accent_soft_text"]
+
+        self.configure(fg_color=bg, border_color=border)
+        self.label_icon.configure(text=icon, text_color=fg)
+        self.label_msg.configure(text=message, text_color=THEME["text_primary"])
+
+        if before_widget is not None:
+            self.pack(fill="x", padx=16, pady=(4, 6), before=before_widget)
+        else:
+            self.pack(fill="x", padx=16, pady=(4, 6))
+
+        self._timer_id = self.after(duration_ms, self.hide)
+
+    def hide(self) -> None:
+        if self._timer_id:
+            try:
+                self.after_cancel(self._timer_id)
+            except Exception:
+                pass
+            self._timer_id = None
+        self.pack_forget()
+
+class ModernNotificationModal(ctk.CTkToplevel):
+    def __init__(
+        self,
+        parent: Any,
+        variant: Literal["success", "warning", "error", "confirm"] = "success",
+        title: str = "",
+        summary: str = "",
+        solution: str = "",
+        info_box: dict[str, str] | str | None = None,
+        technical_detail: str = "",
+        primary_action_label: str = "",
+        primary_action_callback: Callable[[], None] | None = None,
+        secondary_action_label: str = "",
+        secondary_action_callback: Callable[[], None] | None = None,
+        theme: ThemeTokens | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.parent = parent
+        self.variant = variant
+        self.summary_text = summary
+        self.solution_text = solution
+        self.info_box = info_box
+        self.technical_detail = technical_detail
+        self.primary_callback = primary_action_callback
+        self.secondary_callback = secondary_action_callback
+        self.theme = theme or ThemeTokens()
+        self.result = False
+
+        if not title:
+            if variant == "success":
+                title = "Proses Berhasil"
+            elif variant == "warning":
+                title = "Perhatian"
+            elif variant == "error":
+                title = "Terjadi Kesalahan"
+            elif variant == "confirm":
+                title = "Konfirmasi Tindakan"
+        self.title(title)
+        self.resizable(False, False)
+
+        apply_window_icon(self)
+        self.transient(parent)
+        self.grab_set()
+
+        if variant == "success":
+            badge_icon = "✓"
+            badge_bg = THEME["status_ready_bg"]
+            badge_fg = THEME["status_ready_text"]
+            accent_bar_color = ("#10B981", "#10B981")
+            default_primary_lbl = "Buka Folder Hasil PDF"
+            default_secondary_lbl = "Selesai"
+        elif variant == "warning":
+            badge_icon = "!"
+            badge_bg = THEME["status_warn_bg"]
+            badge_fg = THEME["status_warn_text"]
+            accent_bar_color = ("#F59E0B", "#F59E0B")
+            default_primary_lbl = "Mengerti"
+            default_secondary_lbl = "Tutup"
+        elif variant == "error":
+            badge_icon = "✕"
+            badge_bg = THEME["status_error_bg"]
+            badge_fg = THEME["status_error_text"]
+            accent_bar_color = ("#EF4444", "#EF4444")
+            default_primary_lbl = "Mengerti & Tutup"
+            default_secondary_lbl = "Coba Lagi"
+        else:
+            badge_icon = "?"
+            badge_bg = THEME["btn_accent_soft_bg"]
+            badge_fg = THEME["btn_accent_soft_text"]
+            accent_bar_color = ("#2563EB", "#2563EB")
+            default_primary_lbl = "Ya, Hentikan Proses"
+            default_secondary_lbl = "Lanjutkan Mencetak"
+
+        self.primary_label = primary_action_label or default_primary_lbl
+        self.secondary_label = secondary_action_label
+
+        card = ctk.CTkFrame(
+            self,
+            fg_color=THEME["bg_card"],
+            border_color=THEME["border_card"],
+            border_width=1,
+            corner_radius=self.theme.corner_radius_card,
+        )
+        card.pack(fill="both", expand=True, padx=2, pady=2)
+
+        ctk.CTkFrame(
+            card,
+            height=4,
+            corner_radius=2,
+            fg_color=accent_bar_color,
+        ).pack(fill="x", side="top")
+
+        content = ctk.CTkFrame(card, fg_color="transparent")
+        content.pack(fill="both", expand=True, padx=20, pady=(16, 16))
+
+        hdr_frame = ctk.CTkFrame(content, fg_color="transparent")
+        hdr_frame.pack(fill="x", pady=(0, 10))
+
+        badge = ctk.CTkLabel(
+            hdr_frame,
+            text=badge_icon,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=15, weight="bold"),
+            text_color=badge_fg,
+            fg_color=badge_bg,
+            corner_radius=16,
+            width=32,
+            height=32,
+        )
+        badge.pack(side="left", padx=(0, 12))
+
+        title_lbl = ctk.CTkLabel(
+            hdr_frame,
+            text=title,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=15, weight="bold"),
+            text_color=THEME["text_primary"],
+            anchor="w",
+        )
+        title_lbl.pack(side="left", fill="x", expand=True)
+
+        if self.summary_text:
+            summary_lbl = ctk.CTkLabel(
+                content,
+                text=self.summary_text,
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+                text_color=THEME["text_secondary"],
+                anchor="w",
+                justify="left",
+                wraplength=480,
+            )
+            summary_lbl.pack(fill="x", pady=(0, 10))
+
+        if self.info_box:
+            info_frame = ctk.CTkFrame(
+                content,
+                fg_color=THEME["bg_elevated"],
+                border_color=THEME["border_surface"],
+                border_width=1,
+                corner_radius=self.theme.corner_radius_inner,
+            )
+            info_frame.pack(fill="x", pady=(0, 10))
+
+            if isinstance(self.info_box, dict):
+                for k, v in self.info_box.items():
+                    row_f = ctk.CTkFrame(info_frame, fg_color="transparent")
+                    row_f.pack(fill="x", padx=12, pady=3)
+                    ctk.CTkLabel(
+                        row_f,
+                        text=f"{k}:",
+                        font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+                        text_color=THEME["text_secondary"],
+                        anchor="w",
+                    ).pack(side="left")
+                    ctk.CTkLabel(
+                        row_f,
+                        text=str(v),
+                        font=ctk.CTkFont(family=self.theme.font_family_mono, size=11, weight="bold"),
+                        text_color=THEME["text_primary"],
+                        anchor="e",
+                    ).pack(side="right")
+            else:
+                ctk.CTkLabel(
+                    info_frame,
+                    text=str(self.info_box),
+                    font=ctk.CTkFont(family=self.theme.font_family_mono, size=11),
+                    text_color=THEME["text_primary"],
+                    justify="left",
+                    anchor="w",
+                ).pack(padx=12, pady=8, fill="x")
+
+        if self.solution_text:
+            sol_frame = ctk.CTkFrame(
+                content,
+                fg_color=THEME["bg_surface"],
+                border_color=THEME["border_surface"],
+                border_width=1,
+                corner_radius=6,
+            )
+            sol_frame.pack(fill="x", pady=(0, 10))
+
+            ctk.CTkLabel(
+                sol_frame,
+                text="Langkah Perbaikan:",
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
+                text_color=THEME["text_primary"],
+                anchor="w",
+            ).pack(anchor="w", padx=10, pady=(6, 2))
+
+            ctk.CTkLabel(
+                sol_frame,
+                text=self.solution_text,
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=10),
+                text_color=THEME["text_secondary"],
+                justify="left",
+                anchor="w",
+                wraplength=460,
+            ).pack(anchor="w", padx=10, pady=(0, 6))
+
+        self.tech_container = None
+        if self.technical_detail:
+            tech_toggle_row = ctk.CTkFrame(content, fg_color="transparent")
+            tech_toggle_row.pack(fill="x", pady=(0, 4))
+
+            self.btn_toggle_tech = ctk.CTkButton(
+                tech_toggle_row,
+                text="Lihat Detail Teknis ▾",
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=10),
+                text_color=THEME["text_muted"],
+                fg_color="transparent",
+                hover_color=THEME["bg_hover"],
+                height=22,
+                corner_radius=4,
+                command=self._toggle_tech_details,
+            )
+            self.btn_toggle_tech.pack(side="left")
+
+            self.tech_container = ctk.CTkFrame(
+                content,
+                fg_color=THEME["bg_surface"],
+                border_color=THEME["border_surface"],
+                border_width=1,
+                corner_radius=6,
+            )
+
+            tech_box = ctk.CTkTextbox(
+                self.tech_container,
+                height=70,
+                font=ctk.CTkFont(family=self.theme.font_family_mono, size=10),
+                text_color=THEME["text_secondary"],
+                fg_color="transparent",
+                wrap="word",
+            )
+            tech_box.pack(fill="both", expand=True, padx=8, pady=(6, 4))
+            tech_box.insert("1.0", self.technical_detail)
+            tech_box.configure(state="disabled")
+
+            self.btn_copy_log = ctk.CTkButton(
+                self.tech_container,
+                text="Salin Log",
+                width=80,
+                height=24,
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
+                fg_color=THEME["btn_secondary_bg"],
+                hover_color=THEME["btn_secondary_hover"],
+                text_color=THEME["btn_secondary_text"],
+                corner_radius=4,
+                command=self._copy_tech_log,
+            )
+            self.btn_copy_log.pack(side="right", padx=8, pady=(0, 6))
+
+        btn_row = ctk.CTkFrame(content, fg_color="transparent")
+        btn_row.pack(fill="x", pady=(8, 0))
+
+        if self.secondary_label:
+            ctk.CTkButton(
+                btn_row,
+                text=self.secondary_label,
+                height=34,
+                font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+                fg_color=THEME["btn_secondary_bg"],
+                hover_color=THEME["btn_secondary_hover"],
+                text_color=THEME["btn_secondary_text"],
+                border_color=THEME["border_surface"],
+                border_width=1,
+                corner_radius=self.theme.corner_radius_inner,
+                command=self._on_secondary_action,
+            ).pack(side="left")
+
+        if variant == "confirm":
+            pri_bg = THEME["btn_danger_bg"]
+            pri_hover = THEME["btn_danger_hover"]
+            pri_text = THEME["btn_danger_text"]
+        elif variant == "success":
+            pri_bg = THEME["btn_primary_bg"]
+            pri_hover = THEME["btn_primary_hover"]
+            pri_text = THEME["btn_primary_text"]
+        else:
+            pri_bg = THEME["btn_secondary_bg"]
+            pri_hover = THEME["btn_secondary_hover"]
+            pri_text = THEME["btn_secondary_text"]
+
+        ctk.CTkButton(
+            btn_row,
+            text=self.primary_label,
+            height=34,
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
+            fg_color=pri_bg,
+            hover_color=pri_hover,
+            text_color=pri_text,
+            corner_radius=self.theme.corner_radius_inner,
+            command=self._on_primary_action,
+        ).pack(side="right")
+
+        self.bind("<Escape>", lambda e: self._on_escape())
+        self.bind("<Return>", lambda e: self._on_return())
+
+        self._adjust_geometry()
+
+    def _adjust_geometry(self) -> None:
+        self.update_idletasks()
+        req_w = 540
+        req_h = self.winfo_reqheight() + 20
+        req_h = max(240, min(req_h, 640))
+
+        pw = self.parent.winfo_width() if hasattr(self.parent, "winfo_width") else 1000
+        ph = self.parent.winfo_height() if hasattr(self.parent, "winfo_height") else 700
+        px = self.parent.winfo_rootx() if hasattr(self.parent, "winfo_rootx") else 100
+        py = self.parent.winfo_rooty() if hasattr(self.parent, "winfo_rooty") else 100
+
+        x = max(10, px + (pw - req_w) // 2)
+        y = max(10, py + (ph - req_h) // 2)
+        self.geometry(f"{req_w}x{req_h}+{x}+{y}")
+        self.lift()
+        self.focus_force()
+
+    def _toggle_tech_details(self) -> None:
+        if not self.tech_container:
+            return
+        if self.tech_container.winfo_ismapped():
+            self.tech_container.pack_forget()
+            self.btn_toggle_tech.configure(text="Lihat Detail Teknis ▾")
+        else:
+            self.tech_container.pack(fill="x", pady=(0, 8))
+            self.btn_toggle_tech.configure(text="Sembunyikan Detail Teknis ▴")
+        self._adjust_geometry()
+
+    def _copy_tech_log(self) -> None:
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(self.technical_detail)
+            self.btn_copy_log.configure(text="Tersalin ✓")
+            self.after(2000, lambda: self.btn_copy_log.configure(text="Salin Log"))
+        except Exception:
+            pass
+
+    def _on_primary_action(self) -> None:
+        self.result = True
+        self.destroy()
+        if self.primary_callback:
+            try:
+                self.primary_callback()
+            except Exception:
+                pass
+
+    def _on_secondary_action(self) -> None:
+        self.result = False
+        self.destroy()
+        if self.secondary_callback:
+            try:
+                self.secondary_callback()
+            except Exception:
+                pass
+
+    def _on_escape(self) -> None:
+        if self.secondary_label and self.secondary_callback:
+            self._on_secondary_action()
+        else:
+            self.destroy()
+
+    def _on_return(self) -> None:
+        self._on_primary_action()
 
 class DocumentSourceRow(ctk.CTkFrame):
     """Komponen 2 baris rapi untuk sumber dokumen Word dan Excel dengan toolbar anti-clipping."""
@@ -917,14 +1374,23 @@ class AboutModal(ctk.CTkToplevel):
                     self.destroy()
                     UpdateNotificationModal(master, self.theme, info)
                 elif info.get("error"):
-                    messagebox.showwarning(
-                        "Gagal Memeriksa",
-                        f"Tidak dapat terhubung ke server pembaruan: {info['error']}",
+                    ModernNotificationModal(
+                        parent=self,
+                        variant="warning",
+                        title="Gagal Memeriksa Pembaruan",
+                        summary=f"Tidak dapat terhubung ke server pembaruan: {info['error']}",
+                        solution="Pastikan perangkat terhubung ke internet dan domain GitHub tidak diblokir.",
+                        primary_action_label="Mengerti & Tutup",
+                        theme=self.theme,
                     )
                 else:
-                    messagebox.showinfo(
-                        "Sudah Versi Terbaru",
-                        f"✓ Anda sudah menggunakan versi terbaru (v{__version__}).",
+                    ModernNotificationModal(
+                        parent=self,
+                        variant="success",
+                        title="Sudah Versi Terbaru",
+                        summary=f"Anda saat ini sudah menggunakan versi resmi terbaru (v{__version__}).",
+                        primary_action_label="Mengerti",
+                        theme=self.theme,
                     )
 
             self.after(0, finish)
@@ -1162,10 +1628,25 @@ class UpdateNotificationModal(ctk.CTkToplevel):
 
     def _on_update_done(self, ok: bool, msg: str) -> None:
         if ok:
-            messagebox.showinfo("Pembaruan Berhasil", msg)
+            ModernNotificationModal(
+                parent=self.master,
+                variant="success",
+                title="Pembaruan Berhasil",
+                summary=msg,
+                primary_action_label="Mengerti & Tutup",
+                theme=self.theme,
+            )
             self.destroy()
         else:
-            messagebox.showerror("Gagal Memperbarui", msg)
+            ModernNotificationModal(
+                parent=self,
+                variant="error",
+                title="Gagal Memperbarui",
+                summary=msg,
+                solution="Periksa koneksi internet Anda atau unduh paket rilis terbaru secara manual dari GitHub Releases.",
+                primary_action_label="Mengerti & Tutup",
+                theme=self.theme,
+            )
             self.btn_later.configure(state="normal")
             self.btn_github.configure(state="normal")
             self.btn_update.configure(state="normal", text="Coba Update Lagi")
@@ -1364,9 +1845,14 @@ class ColumnMapperModal(ctk.CTkToplevel):
         nama_choice = self.field_vars["nama"].get()
         nama_idx = self.label_to_col_idx.get(nama_choice)
         if nama_idx is None:
-            messagebox.showwarning(
-                "Kolom Nama Diperlukan",
-                "Kolom 'Nama Pemilih' wajib ditentukan agar aplikasi dapat mencetak surat pemanggilan.\n\nPilih kolom yang memuat nama warga dari daftar, lalu klik 'Terapkan & Scan Ulang'.",
+            ModernNotificationModal(
+                parent=self,
+                variant="warning",
+                title="Kolom Nama Diperlukan",
+                summary="Kolom 'Nama Pemilih' wajib ditentukan agar aplikasi dapat mencetak surat pemanggilan.",
+                solution="Pilih kolom yang memuat nama warga dari daftar, lalu klik 'Terapkan & Scan Ulang'.",
+                primary_action_label="Mengerti & Lengkapi",
+                theme=self.theme,
             )
             return
 

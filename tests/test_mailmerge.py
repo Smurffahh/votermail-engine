@@ -1047,7 +1047,7 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(parse_version_tuple(""), (0, 0, 0))
 
         latest = get_latest_release_entry()
-        self.assertEqual(latest.get("version"), "1.10.0")
+        self.assertEqual(latest.get("version"), "1.9.1")
         self.assertIn("highlights", latest)
         self.assertGreater(len(latest["highlights"]), 0)
 
@@ -1158,6 +1158,103 @@ class TestMailMergeApp(unittest.TestCase):
             res_err = check_for_updates(current_version="1.10.0")
             self.assertFalse(res_err["update_available"])
             self.assertIsNotNone(res_err["error"])
+
+    def test_32_security_hardening_jinja2_and_excel_sanitizer(self) -> None:
+        from app.core.security import validate_safe_template_tags, sanitize_cell_text
+
+        # 1. Test validate_safe_template_tags - Safe standard tags
+        safe_standard = "Surat Pemanggilan untuk {{nama_1}}, beralamat di {{alamat}}, TPS: {{tps}}."
+        is_safe, msg = validate_safe_template_tags(safe_standard)
+        self.assertTrue(is_safe)
+        self.assertEqual(msg, "")
+
+        self.assertTrue(validate_safe_template_tags("No: {{nomor_1}} Nama: {{nama}} RT: {{rt}}")[0])
+
+        # 2. Test validate_safe_template_tags - Dangerous execution / injection tags
+        self.assertFalse(validate_safe_template_tags("{{ ''.__class__ }}")[0])
+        self.assertFalse(validate_safe_template_tags("{{ config.items() }}")[0])
+        self.assertFalse(validate_safe_template_tags("{% import os %}")[0])
+        self.assertFalse(validate_safe_template_tags("{% if true %} Hello {% endif %}")[0])
+        self.assertFalse(validate_safe_template_tags("{{ __import__('os').system('calc') }}")[0])
+        self.assertFalse(validate_safe_template_tags("{{ a[0] }}")[0])
+        self.assertFalse(validate_safe_template_tags("{{ x | upper }}")[0])
+
+        # 3. Test sanitize_cell_text - Formula error values
+        for err_val in ("#REF!", "#ref!", "#VALUE!", "#value!", "#N/A", "#n/a", "#DIV/0!", "#NAME?", "#NUM!"):
+            self.assertEqual(sanitize_cell_text(err_val), "")
+
+        # 4. Test sanitize_cell_text - Max length constraint (250 chars)
+        long_text = "B" * 300
+        sanitized_long = sanitize_cell_text(long_text)
+        self.assertEqual(len(sanitized_long), 250)
+        self.assertTrue(sanitized_long.endswith("..."))
+        self.assertEqual(sanitized_long[:10], "BBBBBBBBBB")
+
+        # 5. Normal text remains intact
+        self.assertEqual(sanitize_cell_text("Budi Santoso"), "Budi Santoso")
+
+    def test_33_exception_translation_and_modern_notifications(self) -> None:
+        from app.core.security import translate_exception_to_user_message
+        from app.ui.components import ModernNotificationModal, InAppToastBanner
+        from app.config.theme import ThemeTokens
+        import customtkinter as ctk
+
+        # 1. PermissionError translation (No raw internal path leak in summary/solution)
+        perm_exc = PermissionError("[Errno 13] Permission denied: 'D:\\secret\\KADUS_1.pdf'")
+        res_perm = translate_exception_to_user_message(perm_exc, context_label="Wilayah Kadus 1")
+        self.assertIn("File Sedang Terbuka", res_perm["title"])
+        self.assertTrue("program lain" in res_perm["summary"] or "aplikasi lain" in res_perm["summary"])
+        self.assertIn("Tutup file", res_perm["solution"])
+        self.assertNotIn("D:\\secret", res_perm["summary"])
+        self.assertNotIn("D:\\secret", res_perm["solution"])
+        self.assertIn("[PermissionError]", res_perm["technical_detail"])
+
+        # 2. FileNotFoundError translation (docxcompose ZIP extraction guide)
+        fnf_exc = FileNotFoundError("[Errno 2] No such file or directory: 'D:\\...\\_internal\\docxcompose\\templates\\custom.xml'")
+        res_fnf = translate_exception_to_user_message(fnf_exc)
+        self.assertIn("Komponen Template Internal", res_fnf["title"])
+        self.assertIn("ZIP", res_fnf["solution"])
+
+        # 3. pywintypes COM error translation
+        com_exc = Exception("pywintypes.com_error: (-2147023170, 'The remote procedure call failed.', None, None)")
+        res_com = translate_exception_to_user_message(com_exc, context_label="Surat Panggilan")
+        self.assertIn("Microsoft Word", res_com["title"])
+        self.assertIn("tidak merespons", res_com["summary"])
+
+        # 4. ModernNotificationModal & InAppToastBanner headless test
+        root = ctk.CTk()
+        root.withdraw()
+        try:
+            theme = ThemeTokens()
+            toast = InAppToastBanner(root, theme=theme)
+            toast.show("Notifikasi tes berhasil", variant="success")
+            self.assertEqual(toast.label_msg.cget("text"), "Notifikasi tes berhasil")
+            toast.hide()
+
+            modal_succ = ModernNotificationModal(
+                parent=root,
+                variant="success",
+                title="Selesai Cetak",
+                summary="Semua surat berhasil dibuat.",
+                info_box={"Wilayah": "Kadus 1", "Total": "100 Surat"},
+                theme=theme,
+            )
+            self.assertEqual(modal_succ.variant, "success")
+            modal_succ.destroy()
+
+            modal_err = ModernNotificationModal(
+                parent=root,
+                variant="error",
+                title="Gagal",
+                summary="Gagal memproses",
+                solution="Silakan coba lagi",
+                technical_detail="Err code 500",
+                theme=theme,
+            )
+            self.assertEqual(modal_err.variant, "error")
+            modal_err.destroy()
+        finally:
+            root.destroy()
 
 if __name__ == "__main__":
     unittest.main()

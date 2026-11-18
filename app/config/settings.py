@@ -85,22 +85,40 @@ class AppConfig(BaseModel):
     enable_pdf_verification: bool = True
     theme_mode: str = "Dark"
 
+def _is_safe_local_path(path_str: str) -> bool:
+    if not path_str or not isinstance(path_str, str):
+        return False
+    if path_str.startswith(("\\\\", "//")):
+        return False
+    p = Path(path_str)
+    try:
+        if p.is_symlink():
+            return False
+        return p.exists()
+    except Exception:
+        return False
+
 def load_app_config() -> AppConfig:
     if CONFIG_FILE_PATH.exists():
         try:
+            if CONFIG_FILE_PATH.is_symlink():
+                raise PermissionError("config.json berupa symlink tidak diizinkan.")
+            if CONFIG_FILE_PATH.stat().st_size > 64 * 1024:
+                raise ValueError("Ukuran config.json melebihi batas 64 KB.")
+
             with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             excel = data.get("excel_path", "")
-            if not excel or not os.path.exists(excel):
+            if not _is_safe_local_path(excel):
                 data["excel_path"] = get_default_excel_path()
 
             word = data.get("word_path", "")
-            if not word or not os.path.exists(word):
+            if not _is_safe_local_path(word):
                 data["word_path"] = get_default_word_path()
 
             out = data.get("output_dir", "")
-            if not out or not os.path.exists(out):
+            if not _is_safe_local_path(out):
                 data["output_dir"] = str(OUTPUT_DIR.resolve())
 
             addr = data.get("address_mode", "")
