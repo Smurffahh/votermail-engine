@@ -81,6 +81,12 @@ FEATURE_REGISTRY: list[dict[str, str]] = [
         "title": "Ikon Resmi VoterMail Engine & Identitas Taskbar Windows",
         "description": "Penambahan ikon resmi VoterMail Engine pada jendela utama, seluruh jendela pop-up (Tentang & Atur Kolom), Taskbar Windows, serta file executable (.EXE).",
     },
+    {
+        "version": "1.8.3",
+        "date": "2026-11-18",
+        "title": "Opsi Format Alamat Paten Berbasis Nama Sheet & Live Preview",
+        "description": "Penambahan opsi format alamat paten 'Dusun [1..N], RT / RW, Desa Karangjengkol' berbasis nama sheet dengan pembaruan pratinjau instan.",
+    },
 ]
 
 def get_current_version() -> str:

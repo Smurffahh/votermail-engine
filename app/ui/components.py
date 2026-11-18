@@ -12,7 +12,7 @@ import webbrowser
 from tkinter import messagebox
 import customtkinter as ctk
 
-from app.config.settings import APP_ICON_ICO, APP_ICON_PNG
+from app.config.settings import APP_ICON_ICO, APP_ICON_PNG, DEFAULT_ADDRESS_FORMAT
 from app.config.theme import THEME, ThemeTokens
 from app.config.version import (
     __app_name__,
@@ -23,7 +23,7 @@ from app.config.version import (
     __version__,
     FEATURE_REGISTRY,
 )
-from app.core.excel_scanner import VoterData, is_blocked_pii
+from app.core.excel_scanner import VoterData, is_blocked_pii, build_voter_address
 
 def apply_window_icon(window: Any) -> None:
     if not APP_ICON_ICO.exists():
@@ -453,6 +453,8 @@ class VoterPreviewTable(ctk.CTkFrame):
             **kwargs,
         )
         self.theme = theme
+        self.cached_voters: list[VoterData] = []
+        self.cached_address_format: str = DEFAULT_ADDRESS_FORMAT
 
         self._build_ui()
 
@@ -498,21 +500,31 @@ class VoterPreviewTable(ctk.CTkFrame):
         )
         self.empty_label.pack(pady=24)
 
-    def set_voters(self, voters: list[VoterData]) -> None:
+    def set_voters(self, voters: list[VoterData], address_format: str | None = None) -> None:
+        self.cached_voters = list(voters)
+        if address_format:
+            self.cached_address_format = address_format
+        self._render_rows()
+
+    def update_address_format(self, address_format: str) -> None:
+        self.cached_address_format = address_format
+        self._render_rows()
+
+    def _render_rows(self) -> None:
         for child in self.rows_container.winfo_children():
             child.destroy()
 
-        if not voters:
+        if not self.cached_voters:
             self.empty_label = ctk.CTkLabel(
                 self.rows_container,
-                text="Tidak ada pemilih untuk ditampilkan.",
+                text="Belum ada data pemilih. Pilih dan scan berkas Excel DPT di kartu 1 untuk melihat pratinjau 5 pemilih pertama.",
                 font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
                 text_color=THEME["text_muted"],
             )
             self.empty_label.pack(pady=24)
             return
 
-        for voter in voters[:5]:
+        for voter in self.cached_voters[:5]:
             row = ctk.CTkFrame(self.rows_container, fg_color="transparent", height=24)
             row.pack(fill="x", padx=4, pady=2)
 
@@ -556,7 +568,8 @@ class VoterPreviewTable(ctk.CTkFrame):
             )
             c4.pack(side="left", padx=4)
 
-            alamat_wilayah = f"{voter.alamat} ({voter.sheet_name})" if voter.sheet_name else voter.alamat
+            display_addr = build_voter_address(voter, self.cached_address_format) if self.cached_address_format else voter.alamat
+            alamat_wilayah = f"{display_addr} ({voter.sheet_name})" if voter.sheet_name else display_addr
             c5 = ctk.CTkLabel(
                 row,
                 text=alamat_wilayah,

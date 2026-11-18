@@ -824,5 +824,93 @@ class TestMailMergeApp(unittest.TestCase):
         apply_window_icon(None)
         apply_window_icon(object())
 
+    def test_25_custom_dusun_patent_address_format(self) -> None:
+        from app.config.settings import (
+            ADDRESS_FORMAT_OPTIONS,
+            ADDRESS_FORMAT_FULL,
+            ADDRESS_FORMAT_DUSUN_PATENT,
+            ADDRESS_FORMAT_SHORT,
+            DEFAULT_ADDRESS_FORMAT,
+            PATENTED_VILLAGE_NAME,
+        )
+        from app.core.excel_scanner import (
+            format_dusun_from_sheet,
+            build_voter_address,
+            VoterData,
+        )
+
+        # 1. Test format_dusun_from_sheet
+        self.assertEqual(format_dusun_from_sheet("KADUS 1"), "Dusun 1")
+        self.assertEqual(format_dusun_from_sheet("KADUS 5"), "Dusun 5")
+        self.assertEqual(format_dusun_from_sheet("DUSUN 03"), "Dusun 3")
+        self.assertEqual(format_dusun_from_sheet("Sheet2"), "Dusun 2")
+        self.assertEqual(format_dusun_from_sheet("KADUS II"), "Dusun II")
+        self.assertEqual(format_dusun_from_sheet(""), "Dusun 1")
+
+        # 2. Test default address format constant
+        self.assertEqual(DEFAULT_ADDRESS_FORMAT, ADDRESS_FORMAT_FULL)
+        self.assertEqual(ADDRESS_FORMAT_OPTIONS[0], "Lengkap (Alamat, RT / RW)")
+        self.assertIn(ADDRESS_FORMAT_DUSUN_PATENT, ADDRESS_FORMAT_OPTIONS)
+        self.assertIn(ADDRESS_FORMAT_SHORT, ADDRESS_FORMAT_OPTIONS)
+
+        # 3. Test build_voter_address with dict and VoterData
+        sample_dict = {
+            "alamat_raw": "Jalan Melati No 4",
+            "rt_raw": "1",
+            "rw_raw": "1",
+            "sheet_name": "KADUS 1",
+        }
+
+        # Mode 1: Default Lengkap (Alamat, RT / RW)
+        addr_default = build_voter_address(sample_dict)
+        self.assertEqual(addr_default, "Jalan Melati No 4, RT 001 / RW 001")
+        addr_full = build_voter_address(sample_dict, address_format=ADDRESS_FORMAT_FULL)
+        self.assertEqual(addr_full, "Jalan Melati No 4, RT 001 / RW 001")
+
+        # Mode 2: Dusun, RT / RW, Desa Karangjengkol (Patent Format)
+        addr_patent = build_voter_address(sample_dict, address_format=ADDRESS_FORMAT_DUSUN_PATENT)
+        self.assertEqual(addr_patent, "Dusun 1, RT 001 / RW 001, Desa Karangjengkol")
+
+        # Mode 2 with empty alamat
+        sample_empty_addr = {
+            "alamat_raw": "",
+            "rt_raw": "02",
+            "rw_raw": "05",
+            "sheet_name": "KADUS 3",
+        }
+        addr_patent_empty = build_voter_address(sample_empty_addr, address_format=ADDRESS_FORMAT_DUSUN_PATENT)
+        self.assertEqual(addr_patent_empty, "Dusun 3, RT 002 / RW 005, Desa Karangjengkol")
+
+        # Mode 3: Ringkas
+        addr_short = build_voter_address(sample_dict, address_format=ADDRESS_FORMAT_SHORT)
+        self.assertEqual(addr_short, "Jalan Melati No 4")
+
+        # 4. Test VoterData model instance
+        voter = VoterData(
+            nomor="1",
+            nama="Budi Santoso",
+            jenis_kelamin="Laki-laki",
+            umur="25 Tahun",
+            alamat="KARANGJENGKOL, RT 001 / RW 001",
+            sheet_name="KADUS 1",
+            wilayah="KADUS 1",
+            row_index=5,
+            alamat_raw="KARANGJENGKOL",
+            rt_raw="1",
+            rw_raw="1",
+            rt_formatted="001",
+            rw_formatted="001",
+            dusun_label="Dusun 1",
+        )
+
+        self.assertEqual(
+            build_voter_address(voter, address_format=ADDRESS_FORMAT_DUSUN_PATENT),
+            "Dusun 1, RT 001 / RW 001, Desa Karangjengkol",
+        )
+        self.assertEqual(
+            build_voter_address(voter, address_format=ADDRESS_FORMAT_FULL),
+            "KARANGJENGKOL, RT 001 / RW 001",
+        )
+
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,15 @@ from typing import Any
 import pandas as pd
 from pydantic import BaseModel, Field
 
+from app.config.settings import (
+    ADDRESS_FORMAT_OPTIONS,
+    ADDRESS_FORMAT_FULL,
+    ADDRESS_FORMAT_DUSUN_PATENT,
+    ADDRESS_FORMAT_SHORT,
+    DEFAULT_ADDRESS_FORMAT,
+    PATENTED_VILLAGE_NAME,
+)
+
 @dataclass
 class ExcelSnapshot:
     file_path: str
@@ -114,6 +123,12 @@ class VoterData(BaseModel):
     wilayah: str
     row_index: int
     extra_fields: dict[str, str] = Field(default_factory=dict)
+    alamat_raw: str = ""
+    rt_raw: str = ""
+    rw_raw: str = ""
+    rt_formatted: str = ""
+    rw_formatted: str = ""
+    dusun_label: str = ""
 
 class ScanIssue(BaseModel):
     sheet_name: str
@@ -171,17 +186,121 @@ def transform_age(val: Any) -> str:
         return f"{raw} Tahun"
     return raw
 
-def transform_address(alamat_val: Any, rt_val: Any, rw_val: Any, mode: str = "lengkap") -> str:
-    alamat = str(alamat_val or "").strip()
-    if mode != "lengkap":
-        return alamat
-    rt_s = str(rt_val or "").strip()
-    rw_s = str(rw_val or "").strip()
-    if rt_s or rw_s:
-        rt_fmt = rt_s.zfill(3) if rt_s.isdigit() else rt_s
-        rw_fmt = rw_s.zfill(3) if rw_s.isdigit() else rw_s
-        return f"{alamat}, RT {rt_fmt} / RW {rw_fmt}".strip(", ")
-    return alamat
+def format_dusun_from_sheet(sheet_name: str) -> str:
+    raw = str(sheet_name or "").strip()
+    if not raw:
+        return "Dusun 1"
+    num_match = re.search(r"(\d+)", raw)
+    if num_match:
+        return f"Dusun {int(num_match.group(1))}"
+    roman_match = re.match(r"^(?:kadus|dusun|dsn|kds)\s+([IVXLCDM]+)$", raw, flags=re.IGNORECASE)
+    if roman_match:
+        return f"Dusun {roman_match.group(1).upper()}"
+    prefix_match = re.match(r"^(?:kadus|dusun|dsn|kds)\s+(.+)$", raw, flags=re.IGNORECASE)
+    if prefix_match:
+        return f"Dusun {prefix_match.group(1).strip().title()}"
+    return f"Dusun {raw.title()}"
+
+def build_voter_address(
+    voter: Any,
+    address_format: str = DEFAULT_ADDRESS_FORMAT,
+) -> str:
+    if hasattr(voter, "model_dump"):
+        alamat_raw = getattr(voter, "alamat_raw", "") or getattr(voter, "alamat", "")
+        rt_raw = getattr(voter, "rt_raw", "") or getattr(voter, "rt_formatted", "")
+        rw_raw = getattr(voter, "rw_raw", "") or getattr(voter, "rw_formatted", "")
+        sheet_name = getattr(voter, "sheet_name", "") or getattr(voter, "wilayah", "")
+        dusun_label = getattr(voter, "dusun_label", "")
+        extra = getattr(voter, "extra_fields", {}) or {}
+        if not rt_raw and "rt" in extra:
+            rt_raw = extra["rt"]
+        if not rw_raw and "rw" in extra:
+            rw_raw = extra["rw"]
+    elif isinstance(voter, dict):
+        alamat_raw = voter.get("alamat_raw", voter.get("alamat", ""))
+        rt_raw = voter.get("rt_raw", voter.get("rt_formatted", voter.get("rt", "")))
+        rw_raw = voter.get("rw_raw", voter.get("rw_formatted", voter.get("rw", "")))
+        sheet_name = voter.get("sheet_name", voter.get("wilayah", ""))
+        dusun_label = voter.get("dusun_label", "")
+    else:
+        return ""
+
+    alamat_raw = str(alamat_raw or "").strip()
+    rt_s = str(rt_raw or "").strip()
+    rw_s = str(rw_raw or "").strip()
+    sheet_name = str(sheet_name or "").strip()
+
+    if not dusun_label:
+        dusun_label = format_dusun_from_sheet(sheet_name)
+
+    rt_clean = re.sub(r"^(?:rt\.?|r\.t\.?)\s*", "", rt_s, flags=re.IGNORECASE).strip()
+    if rt_clean.isdigit():
+        rt_fmt = f"RT {rt_clean.zfill(3)}"
+    elif rt_clean:
+        rt_fmt = f"RT {rt_clean}"
+    else:
+        rt_fmt = ""
+
+    rw_clean = re.sub(r"^(?:rw\.?|r\.w\.?)\s*", "", rw_s, flags=re.IGNORECASE).strip()
+    if rw_clean.isdigit():
+        rw_fmt = f"RW {rw_clean.zfill(3)}"
+    elif rw_clean:
+        rw_fmt = f"RW {rw_clean}"
+    else:
+        rw_fmt = ""
+
+    if rt_fmt and rw_fmt:
+        rt_rw = f"{rt_fmt} / {rw_fmt}"
+    elif rt_fmt:
+        rt_rw = rt_fmt
+    elif rw_fmt:
+        rt_rw = rw_fmt
+    else:
+        rt_rw = ""
+
+    fmt = str(address_format or "").strip()
+    is_dusun_patent = (
+        fmt == ADDRESS_FORMAT_DUSUN_PATENT
+        or ("dusun" in fmt.lower() and "karangjengkol" in fmt.lower())
+    )
+    is_short = (
+        fmt == ADDRESS_FORMAT_SHORT
+        or fmt.lower() in ("ringkas", "hanya alamat", "hanya_alamat")
+    )
+
+    if is_dusun_patent:
+        parts = [dusun_label]
+        if rt_rw:
+            parts.append(rt_rw)
+        parts.append(PATENTED_VILLAGE_NAME)
+        return ", ".join(parts)
+    elif is_short:
+        return alamat_raw if alamat_raw else dusun_label
+    else:
+        if alamat_raw and rt_rw:
+            if f", {rt_rw}" in alamat_raw or alamat_raw.endswith(rt_rw):
+                return alamat_raw
+            return f"{alamat_raw}, {rt_rw}"
+        elif alamat_raw:
+            return alamat_raw
+        elif rt_rw:
+            return rt_rw
+        return ""
+
+def transform_address(
+    alamat_val: Any,
+    rt_val: Any,
+    rw_val: Any,
+    mode: str = DEFAULT_ADDRESS_FORMAT,
+    sheet_name: str = "",
+) -> str:
+    raw_dict = {
+        "alamat_raw": str(alamat_val or "").strip(),
+        "rt_raw": str(rt_val or "").strip(),
+        "rw_raw": str(rw_val or "").strip(),
+        "sheet_name": sheet_name,
+    }
+    return build_voter_address(raw_dict, address_format=mode)
 
 SYNONYMS: dict[str, list[str]] = {
     "no": ["no", "nomor", "no.", "no urut", "nomor urut", "id", "num"],
@@ -347,7 +466,7 @@ def check_cross_sheet_uniformity(
 
 def scan_and_validate_excel(
     file_path: str,
-    address_mode: str = "lengkap",
+    address_mode: str = DEFAULT_ADDRESS_FORMAT,
     custom_column_map: dict[str, int] | None = None,
 ) -> PreFlightScanResult:
     if not os.path.exists(file_path):
@@ -507,10 +626,15 @@ def scan_and_validate_excel(
             raw_umur = row[umur_col] if umur_col is not None and umur_col < len(row) else ""
             umur_val = transform_age(raw_umur)
 
-            raw_alamat = row[alamat_col] if alamat_col is not None and alamat_col < len(row) else ""
-            raw_rt = row[rt_col] if rt_col is not None and rt_col < len(row) else ""
-            raw_rw = row[rw_col] if rw_col is not None and rw_col < len(row) else ""
-            alamat_val = transform_address(raw_alamat, raw_rt, raw_rw, mode=address_mode)
+            raw_alamat_s = str(row[alamat_col] if alamat_col is not None and alamat_col < len(row) else "").strip()
+            raw_rt_s = str(row[rt_col] if rt_col is not None and rt_col < len(row) else "").strip()
+            raw_rw_s = str(row[rw_col] if rw_col is not None and rw_col < len(row) else "").strip()
+            rt_clean = re.sub(r"^(?:rt\.?|r\.t\.?)\s*", "", raw_rt_s, flags=re.IGNORECASE).strip()
+            rw_clean = re.sub(r"^(?:rw\.?|r\.w\.?)\s*", "", raw_rw_s, flags=re.IGNORECASE).strip()
+            rt_fmt = f"RT {rt_clean.zfill(3)}" if rt_clean.isdigit() else (f"RT {rt_clean}" if rt_clean else "")
+            rw_fmt = f"RW {rw_clean.zfill(3)}" if rw_clean.isdigit() else (f"RW {rw_clean}" if rw_clean else "")
+            dusun_lbl = format_dusun_from_sheet(sheet_name)
+            alamat_val = transform_address(raw_alamat_s, raw_rt_s, raw_rw_s, mode=address_mode, sheet_name=sheet_name)
 
             voter_extra: dict[str, str] = {}
             for snake_k, col_i in extra_fields_cols.items():
@@ -529,6 +653,12 @@ def scan_and_validate_excel(
                 wilayah=wilayah_name,
                 row_index=excel_row_num,
                 extra_fields=voter_extra,
+                alamat_raw=raw_alamat_s,
+                rt_raw=raw_rt_s,
+                rw_raw=raw_rw_s,
+                rt_formatted=rt_fmt,
+                rw_formatted=rw_fmt,
+                dusun_label=dusun_lbl,
             )
             voters.append(voter)
 

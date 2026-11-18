@@ -23,6 +23,8 @@ from app.config.settings import (
     clean_temp_dir,
     OUTPUT_DIR,
     TEMP_DIR,
+    ADDRESS_FORMAT_OPTIONS,
+    DEFAULT_ADDRESS_FORMAT,
 )
 from app.config.theme import DARK_THEME, LIGHT_THEME, ThemeTokens, get_theme, THEME
 from app.config.version import (
@@ -516,8 +518,8 @@ class MainWindow(ctk.CTk):
 
         self.address_mode_menu = ctk.CTkOptionMenu(
             addr_box,
-            values=["Lengkap (Alamat, RT / RW)", "Hanya Alamat"],
-            width=210,
+            values=ADDRESS_FORMAT_OPTIONS,
+            width=260,
             height=28,
             fg_color=THEME["btn_secondary_bg"],
             button_color=THEME["btn_secondary_hover"],
@@ -528,9 +530,10 @@ class MainWindow(ctk.CTk):
             dropdown_fg_color=THEME["bg_card"],
             dropdown_text_color=THEME["text_primary"],
             dropdown_hover_color=THEME["bg_hover"],
-            command=lambda _: self._save_active_config(),
+            command=self._on_address_format_changed,
         )
-        self.address_mode_menu.set(self.cfg.address_mode)
+        curr_addr = self.cfg.address_mode if self.cfg.address_mode in ADDRESS_FORMAT_OPTIONS else DEFAULT_ADDRESS_FORMAT
+        self.address_mode_menu.set(curr_addr)
         self.address_mode_menu.pack(side="left")
 
         verify_box = ctk.CTkFrame(ctrl_row, fg_color="transparent")
@@ -764,6 +767,12 @@ class MainWindow(ctk.CTk):
         self.cfg.theme_mode = self.theme.name
         save_app_config(self.cfg)
 
+    def _on_address_format_changed(self, val: str) -> None:
+        self.cfg.address_mode = val
+        self._save_active_config()
+        self.voter_table.update_address_format(val)
+        self._log(f"[PENGATURAN] Format alamat diubah: {val}")
+
     def _on_theme_toggled(self, val: str) -> None:
         mode = "Dark" if "gelap" in val.lower() or val.lower() == "dark" else "Light"
         ctk.set_appearance_mode(mode)
@@ -907,7 +916,7 @@ class MainWindow(ctk.CTk):
             self.excel_status_bar.configure(text="File Excel tidak ditemukan.", text_color=self.theme.status_error)
             return
 
-        addr_mode = "lengkap" if "Lengkap" in self.address_mode_menu.get() else "hanya_alamat"
+        addr_mode = self.address_mode_menu.get().strip()
         custom_map = self.custom_column_map
         self.doc_row_excel.set_status("Memindai struktur DPT...", "process")
         self._log(f"[EXCEL] Memindai struktur DPT: {os.path.basename(path)}")
@@ -974,7 +983,7 @@ class MainWindow(ctk.CTk):
                 sample_voters.extend(s.voters)
                 if len(sample_voters) >= 5:
                     break
-        self.voter_table.set_voters(sample_voters[:5])
+        self.voter_table.set_voters(sample_voters[:5], address_format=self.address_mode_menu.get().strip())
 
         self.excel_ready = True
         if res.is_valid:
@@ -1130,7 +1139,10 @@ class MainWindow(ctk.CTk):
         template_doc = to_win_abs_path(self.word_check_result.prepared_docx_path)
         layout = self.word_check_result.layout_mode if self.word_check_result else "2-UP"
         self._log(f"[PREVIEW] Membuat pratinjau 1 halaman ({layout}) menggunakan MS Word COM...")
-        ok, msg, final_pdf = generate_preview_via_word(template_doc, sample_voters, preview_pdf, layout_mode=layout)
+        curr_addr_fmt = self.address_mode_menu.get().strip()
+        ok, msg, final_pdf = generate_preview_via_word(
+            template_doc, sample_voters, preview_pdf, layout_mode=layout, address_format=curr_addr_fmt
+        )
 
         if ok:
             self._log(f"[PREVIEW SELESAI] Pratinjau tersimpan di: {final_pdf}")
@@ -1193,6 +1205,7 @@ class MainWindow(ctk.CTk):
         template_doc = self.word_check_result.prepared_docx_path
         verify_pdf_on = self.verify_switch.get() == 1
         layout_mode = self.word_check_result.layout_mode if self.word_check_result else "2-UP"
+        active_address_format = self.address_mode_menu.get().strip()
 
         self._log(f"[MAILING MULAI] Memulai proses mailing {len(selected_sheets)} Kadus ({total_voters_all:,} pemilih, Mode: {layout_mode})...")
 
@@ -1226,6 +1239,7 @@ class MainWindow(ctk.CTk):
                     phase_callback=phase_cb,
                     cancel_event=self.cancel_event,
                     layout_mode=layout_mode,
+                    address_format=active_address_format,
                 )
 
                 if not ok:

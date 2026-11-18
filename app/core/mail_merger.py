@@ -20,7 +20,7 @@ import win32com.client
 
 from app.config.settings import TEMP_DIR
 from app.config.version import __version__, __author__, __repository__
-from app.core.excel_scanner import VoterData
+from app.core.excel_scanner import VoterData, build_voter_address
 from app.core.security import check_file_accessible_for_writing, safe_delete_file, to_win_abs_path
 
 def apply_pdf_metadata(pdf_path: str, kadus_name: str = "") -> None:
@@ -143,6 +143,7 @@ def merge_voters_to_pdf_via_word_com(
     phase_callback: Callable[[str, float], None] | None = None,
     cancel_event: threading.Event | None = None,
     layout_mode: str = "2-UP",
+    address_format: str | None = None,
 ) -> tuple[bool, int, str]:
     if not voters:
         return False, 0, "Daftar pemilih kosong."
@@ -171,17 +172,18 @@ def merge_voters_to_pdf_via_word_com(
                 if cancel_event is not None and cancel_event.is_set():
                     return False, 0, "Proses mailing dibatalkan pengguna."
 
+                addr_1 = build_voter_address(v1, address_format) if address_format else v1.alamat
                 ctx = {
                     "nomor_1": v1.nomor,
                     "nama_1": v1.nama,
                     "jk_1": v1.jenis_kelamin,
                     "umur_1": v1.umur,
-                    "alamat_1": v1.alamat,
+                    "alamat_1": addr_1,
                     "nomor": v1.nomor,
                     "nama": v1.nama,
                     "jk": v1.jenis_kelamin,
                     "umur": v1.umur,
-                    "alamat": v1.alamat,
+                    "alamat": addr_1,
                 }
                 for k, v in v1.extra_fields.items():
                     ctx[k] = v
@@ -209,17 +211,19 @@ def merge_voters_to_pdf_via_word_com(
                 if cancel_event is not None and cancel_event.is_set():
                     return False, 0, "Proses mailing dibatalkan pengguna."
 
+                addr_1 = build_voter_address(v1, address_format) if address_format else v1.alamat
+                addr_2 = (build_voter_address(v2, address_format) if address_format else v2.alamat) if v2 else ""
                 ctx = {
                     "nomor_1": v1.nomor,
                     "nama_1": v1.nama,
                     "jk_1": v1.jenis_kelamin,
                     "umur_1": v1.umur,
-                    "alamat_1": v1.alamat,
+                    "alamat_1": addr_1,
                     "nomor_2": v2.nomor if v2 else "",
                     "nama_2": v2.nama if v2 else "",
                     "jk_2": v2.jenis_kelamin if v2 else "",
                     "umur_2": v2.umur if v2 else "",
-                    "alamat_2": v2.alamat if v2 else "",
+                    "alamat_2": addr_2,
                 }
                 for k, v in v1.extra_fields.items():
                     ctx[f"{k}_1"] = v
@@ -285,6 +289,7 @@ def generate_preview_via_word(
     sample_voters: list[VoterData],
     output_pdf_path: str,
     layout_mode: str = "2-UP",
+    address_format: str | None = None,
 ) -> tuple[bool, str, str]:
     if not sample_voters:
         sample_voters = [
@@ -332,6 +337,7 @@ def generate_preview_via_word(
         wilayah_name=sample_voters[0].wilayah,
         output_pdf_path=output_pdf_path,
         layout_mode=layout_mode,
+        address_format=address_format,
     )
     final_pdf = to_win_abs_path(output_pdf_path)
     if ok and os.path.exists(final_pdf):

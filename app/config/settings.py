@@ -43,6 +43,18 @@ def get_default_word_path() -> str:
         return str(sample_doc.resolve())
     return ""
 
+ADDRESS_FORMAT_FULL = "Lengkap (Alamat, RT / RW)"
+ADDRESS_FORMAT_DUSUN_PATENT = "Dusun, RT / RW, Desa Karangjengkol"
+ADDRESS_FORMAT_SHORT = "Ringkas (Hanya Alamat / Dusun)"
+
+ADDRESS_FORMAT_OPTIONS = [
+    ADDRESS_FORMAT_FULL,
+    ADDRESS_FORMAT_DUSUN_PATENT,
+    ADDRESS_FORMAT_SHORT,
+]
+DEFAULT_ADDRESS_FORMAT = ADDRESS_FORMAT_FULL
+PATENTED_VILLAGE_NAME = "Desa Karangjengkol"
+
 def get_default_excel_path() -> str:
     real_excel = TEMPLATES_DIR / "DAFTAR PEMILIH TETAP DESA KARANGJENGKOL.xlsx"
     if real_excel.exists():
@@ -56,7 +68,7 @@ class AppConfig(BaseModel):
     word_path: str = Field(default_factory=get_default_word_path)
     excel_path: str = Field(default_factory=get_default_excel_path)
     output_dir: str = Field(default_factory=lambda: str(OUTPUT_DIR.resolve()))
-    address_mode: str = "Lengkap (Alamat, RT / RW)"
+    address_mode: str = DEFAULT_ADDRESS_FORMAT
     enable_pdf_verification: bool = True
     theme_mode: str = "Dark"
 
@@ -77,6 +89,10 @@ def load_app_config() -> AppConfig:
             out = data.get("output_dir", "")
             if not out or not os.path.exists(out):
                 data["output_dir"] = str(OUTPUT_DIR.resolve())
+
+            addr = data.get("address_mode", "")
+            if addr not in ADDRESS_FORMAT_OPTIONS:
+                data["address_mode"] = DEFAULT_ADDRESS_FORMAT
 
             return AppConfig(**data)
         except Exception:
