@@ -6,7 +6,7 @@
 
 Aplikasi desktop Windows berbasis Python untuk mengotomatisasi pembuatan ribuan Surat Pemberitahuan Pemilih dari file Excel DPT menjadi 1 file PDF siap cetak per wilayah (Kadus/RW) menggunakan tata letak asli Microsoft Word.
 
-[![Version](https://img.shields.io/badge/version-1.9.1-10b981?style=flat-square)](https://github.com/Smurffahh/votermail-engine/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.11.0-10b981?style=flat-square)](https://github.com/Smurffahh/votermail-engine/releases/latest)
 [![Build & Release](https://img.shields.io/github/actions/workflow/status/Smurffahh/votermail-engine/ci_release.yml?branch=main&style=flat-square)](https://github.com/Smurffahh/votermail-engine/actions/workflows/ci_release.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%E2%80%A2%20MS%20Word%20COM-334155?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/license-MIT-64748b?style=flat-square)](LICENSE)
@@ -29,7 +29,7 @@ Aplikasi desktop Windows berbasis Python untuk mengotomatisasi pembuatan ribuan 
 
 Panduan berikut ditujukan bagi operator pemilihan di lapangan tanpa perlu menginstal Python atau dependensi:
 
-1. **Unduh aplikasi**: Buka halaman **[Releases Terbaru](https://github.com/Smurffahh/votermail-engine/releases/latest)**, lalu unduh file `VoterMail_Engine_v1.9.1_Windows_x64_Portable.zip`.
+1. **Unduh aplikasi**: Buka halaman **[Releases Terbaru](https://github.com/Smurffahh/votermail-engine/releases/latest)**, lalu unduh file `VoterMail_Engine_v1.11.0_Windows_x64_Portable.zip`.
 2. **Ekstrak folder**: Ekstrak file `.zip` tersebut ke folder mana saja di komputer Windows Anda. Pastikan Microsoft Word telah terpasang di komputer.
 3. **Jalankan aplikasi**: Klik dua kali **`VoterMail_Engine.exe`**.
 4. **Proses cetak 3 langkah di dalam aplikasi**:
@@ -109,16 +109,16 @@ votermail-engine/
 │   └── temp/            # Direktori kerja sementara pemrosesan dokumen
 ├── design-system/       # Dokumentasi token warna dan arsitektur layout UI
 ├── scripts/             # Builder .exe, generator data dummy, & bump version
-└── tests/               # Test suite otomatis (34 unit tests, CI safe)
+└── tests/               # Test suite otomatis (39 unit tests, CI safe)
 ```
 
 ### Menaikkan versi rilis & auto-release CI/CD
 Setiap kali versi dinaikkan menggunakan utilitas CLI berikut dan didorong ke branch `main`, GitHub Actions (`.github/workflows/ci_release.yml`) akan menjalankan seluruh pengujian unit, merakit biner `.exe`, dan menerbitkan rilis GitHub baru secara otomatis:
 
 ```bash
-python scripts/bump_version.py --version 1.8.0 --title "Judul Rilis Baru" --desc "Rincian fitur yang ditambahkan..."
+python scripts/bump_version.py --bump patch --title "Judul Rilis Baru" --desc "Rincian fitur yang ditambahkan..."
 git add .
-git commit -m "feat(release): bump version to v1.8.0"
+git commit -m "feat(release): bump version to v1.11.1"
 git push origin main
 ```
 

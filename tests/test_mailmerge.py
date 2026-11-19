@@ -502,6 +502,7 @@ class TestMailMergeApp(unittest.TestCase):
             __version__,
             FEATURE_REGISTRY,
             get_current_version,
+            validate_version_registry,
         )
         self.assertEqual(__app_name__, "VoterMail Engine")
         self.assertEqual(__author__, "Danang Satria")
@@ -509,7 +510,8 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertTrue(__repository__.startswith("https://github.com/Smurffahh"))
         self.assertEqual(__version__, get_current_version())
         self.assertEqual(FEATURE_REGISTRY[-1]["version"], __version__)
-        self.assertGreaterEqual(len(FEATURE_REGISTRY), 9)
+        self.assertGreaterEqual(len(FEATURE_REGISTRY), 10)
+        self.assertTrue(validate_version_registry())
 
     def test_14_dependency_bootstrapper(self) -> None:
         import main
@@ -1582,8 +1584,8 @@ class TestMailMergeApp(unittest.TestCase):
         import app.ui.components as comp
         import app.ui.modals as modals
 
-        self.assertEqual(__version__, "1.9.4")
-        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.9.4")
+        self.assertEqual(__version__, "1.11.0")
+        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.11.0")
         self.assertEqual(__author__, "Danang Satria")
 
         # Verify modals and helpers exist in modals.py and re-exported in components.py
@@ -1612,6 +1614,94 @@ class TestMailMergeApp(unittest.TestCase):
         ]
         for fname in expected_static_fonts:
             self.assertTrue((FONTS_DIR / fname).exists(), f"Static font asset missing: {fname}")
+
+    def test_39_monotonic_semver_guardrails_and_updater_compatibility(self) -> None:
+        from unittest.mock import patch, MagicMock
+        import json
+        from app.config.version import (
+            __version__,
+            FEATURE_REGISTRY,
+            validate_version_registry,
+            parse_version_tuple,
+        )
+        from app.core.updater import check_for_updates
+
+        # 1. Full Monotonic Guardrail verification on active registry
+        self.assertTrue(validate_version_registry())
+
+        # 2. Negative Scenario: Duplicate versions in registry
+        dup_reg = [
+            {"version": "1.0.0", "title": "A", "description": "A"},
+            {"version": "1.0.0", "title": "B", "description": "B"},
+        ]
+        with self.assertRaises(ValueError) as ctx_dup:
+            validate_version_registry(dup_reg, current_version="1.0.0")
+        self.assertIn("duplikasi versi", str(ctx_dup.exception))
+
+        # 3. Negative Scenario: Regression in versioning (e.g. 1.10.0 -> 1.9.1)
+        regress_reg = [
+            {"version": "1.9.0", "title": "A", "description": "A"},
+            {"version": "1.10.0", "title": "B", "description": "B"},
+            {"version": "1.9.1", "title": "C", "description": "C"},
+        ]
+        with self.assertRaises(ValueError) as ctx_regress:
+            validate_version_registry(regress_reg, current_version="1.9.1")
+        self.assertIn("Regresi versi terdeteksi", str(ctx_regress.exception))
+
+        # 4. Negative Scenario: Invalid SemVer format
+        bad_format_reg = [
+            {"version": "1.10", "title": "A", "description": "A"},
+        ]
+        with self.assertRaises(ValueError) as ctx_fmt:
+            validate_version_registry(bad_format_reg, current_version="1.10")
+        self.assertIn("Format versi tidak valid", str(ctx_fmt.exception))
+
+        # 5. Negative Scenario: Active version mismatch with last registry entry
+        with self.assertRaises(ValueError) as ctx_mismatch:
+            validate_version_registry(FEATURE_REGISTRY, current_version="9.9.9")
+        self.assertIn("tidak cocok", str(ctx_mismatch.exception))
+
+        # 6. Auto-Updater compatibility: Old versions (1.9.4, 1.10.0, 1.10.4) detect 1.11.0
+        mock_payload_1_11 = {
+            "tag_name": "v1.11.0",
+            "name": "VoterMail Engine v1.11.0",
+            "body": "Rilis Resmi v1.11.0",
+            "assets": [
+                {
+                    "name": "VoterMail_Engine_v1.11.0_Windows_x64_Portable.zip",
+                    "browser_download_url": "https://github.com/Smurffahh/votermail-engine/releases/download/v1.11.0/VoterMail_Engine_v1.11.0_Windows_x64_Portable.zip",
+                }
+            ],
+            "html_url": "https://github.com/Smurffahh/votermail-engine/releases/tag/v1.11.0",
+        }
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.read.return_value = json.dumps(mock_payload_1_11).encode("utf-8")
+        mock_resp.__enter__.return_value = mock_resp
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            # User from v1.9.4
+            res_194 = check_for_updates(current_version="1.9.4")
+            self.assertTrue(res_194["update_available"])
+            self.assertEqual(res_194["latest_version"], "1.11.0")
+
+            # User from v1.10.0
+            res_1100 = check_for_updates(current_version="1.10.0")
+            self.assertTrue(res_1100["update_available"])
+            self.assertEqual(res_1100["latest_version"], "1.11.0")
+
+            # User from v1.10.4
+            res_1104 = check_for_updates(current_version="1.10.4")
+            self.assertTrue(res_1104["update_available"])
+            self.assertEqual(res_1104["latest_version"], "1.11.0")
+
+            # User already on v1.11.0
+            res_1110 = check_for_updates(current_version="1.11.0")
+            self.assertFalse(res_1110["update_available"])
+
+            # User on future build v1.12.0
+            res_future = check_for_updates(current_version="1.12.0")
+            self.assertFalse(res_future["update_available"])
 
 if __name__ == "__main__":
     unittest.main()

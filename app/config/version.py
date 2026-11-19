@@ -119,34 +119,22 @@ FEATURE_REGISTRY: list[dict[str, Any]] = [
         ],
     },
     {
-        "version": "1.9.1",
-        "date": "2026-11-18",
-        "title": "Hardening Keamanan Template Word, Sanitasi Sel Excel, & Modern Notification System",
-        "description": "Penguatan keamanan template Word (Jinja2 Tag Guard) & sanitasi sel Excel, penerjemah error ramah pengguna (Zero Stack-Trace Leak), serta penggantian seluruh pop-up bawaan Windows dengan sistem Modern Notification Modal & Ringkasan Selesai Cetak.",
-        "highlights": [
-            "Penerapan Jinja2 Template Tag Whitelist pada dokumen Word untuk mencegah eksploitasi Server/Client-Side Template Injection.",
-            "Sanitasi otomatis error rumus Excel (#REF!, #VALUE!, #N/A) dan pembatasan panjang sel 250 karakter untuk mencegah MS Word membeku.",
-            "Penerjemah error terpusat (Zero Stack-Trace Leak) yang menyajikan panduan Apa + Mengapa + Solusi konkret tanpa path internal mentah.",
-            "Penggantian 100% tkinter.messagebox dengan ModernNotificationModal (Success, Warning, Error, Confirm) dan InAppToastBanner.",
-        ],
-    },
-    {
         "version": "1.10.1",
         "date": "2026-11-18",
-        "title": "Sistem Tema DaisyUI (Garden & Night), FilterStatusBanner, & Monospace Log",
-        "description": "Perombakan sistem tema visual dengan skema DaisyUI Garden & Night, penataan ulang formulir Seksi 3 dengan label teratur 135px & tombol Pratinjau 1 Halaman di header, penambahan FilterStatusBanner 4-status, serta formatting log sistem monospace dengan tag warna dinamis.",
+        "title": "Hardening Keamanan Word, Sanitasi Excel, Tema DaisyUI, & Notifikasi Modern",
+        "description": "Penguatan keamanan template Word (Jinja2 Tag Guard) & sanitasi sel Excel, penerapan sistem tema DaisyUI (Garden & Night) dengan FilterStatusBanner, penerjemah error ramah pengguna (Zero Stack-Trace Leak), serta sistem Modern Notification Modal.",
         "highlights": [
-            "Penerapan palet DaisyUI Garden (Mode Terang) dan DaisyUI Night (Mode Gelap) dengan token radius konsentris 16px, 8px, 8px, 6px.",
-            "Penataan ulang kartu '3. Pengaturan & Cetak PDF' dengan perataan vertikal label 135px dan tombol 'Pratinjau 1 Halaman' di header kanan atas.",
-            "Penambahan FilterStatusBanner dengan umpan balik visual 4-status (Semua Pemilih, Belum Diisi, Aktif Cocok, Tidak Ada Data Cocok).",
-            "Pemformatan log sistem monospace berlebar tetap dengan tag warna kategori dinamis dan tabel pratinjau ASCII 5 pemilih pertama.",
+            "Penerapan Jinja2 Template Tag Whitelist pada dokumen Word untuk mencegah eksploitasi Template Injection.",
+            "Sanitasi otomatis error rumus Excel (#REF!, #VALUE!, #N/A) dan pembatasan panjang sel 250 karakter.",
+            "Penerapan palet tema DaisyUI Garden (Mode Terang) dan DaisyUI Night (Mode Gelap) dengan FilterStatusBanner.",
+            "Penerjemah error terpusat (Zero Stack-Trace Leak) dan ModernNotificationModal terpadu (Success, Warning, Error, Confirm).",
         ],
     },
     {
-        "version": "1.9.2",
+        "version": "1.10.2",
         "date": "2026-11-18",
         "title": "Penyelarasan Desain Pratinjau Pemilih & Tombol Log Kontekstual",
-        "description": "Penyelarasan desain tabel Pratinjau Pemilih agar serasi dengan Log Sistem & Hasil Cek PDF (penambahan sub-header status sampel, baris header berbingkai, struktur baris bergaris tipis dengan badge wilayah KADUS, penyembunyian otomatis scrollbar pada 5 sampel, serta tombol Bersihkan log kontekstual).",
+        "description": "Penyelarasan desain tabel Pratinjau Pemilih agar serasi dengan Log Sistem & Hasil Cek PDF (bar status sampel, header berbingkai, badge wilayah KADUS, perbaikan scrollbar, dan tombol kontekstual).",
         "highlights": [
             "Penyelarasan bahasa desain VoterPreviewTable dengan tab Log Sistem dan Hasil Cek PDF.",
             "Penambahan sub-header status bar menampilkan ringkasan jumlah sampel terpilih dan mode alamat aktif.",
@@ -156,10 +144,10 @@ FEATURE_REGISTRY: list[dict[str, Any]] = [
         ],
     },
     {
-        "version": "1.9.3",
+        "version": "1.10.3",
         "date": "2026-11-19",
         "title": "Migrasi Tipografi ke Inter & Space Mono dengan Pemuat Font Offline",
-        "description": "Pembaruan tipografi antarmuka menggunakan font Inter pada seluruh elemen UI dan font Space Mono pada Log Sistem serta angka metrik, dilengkapi pemuat font offline otomatis.",
+        "description": "Pembaruan tipografi antarmuka ke font Inter (seluruh UI) dan Space Mono (Log Sistem & angka metrik) lengkap dengan pemuat font offline otomatis.",
         "highlights": [
             "Penerapan font Inter sebagai font utama seluruh komponen antarmuka antarmuka (UI Sans).",
             "Penerapan font Space Mono untuk log sistem, detail angka audit, dan angka metrik tabular.",
@@ -168,16 +156,27 @@ FEATURE_REGISTRY: list[dict[str, Any]] = [
         ],
     },
     {
-        "version": "1.9.4",
+        "version": "1.10.4",
         "date": "2026-11-19",
         "title": "Audit Kebersihan Kode, Modularisasi Modal UI, & Efisiensi Aset",
-        "description": "Audit kebenaran kode mendalam, pembersihan kode mati & komentar berlebih, modularisasi komponen modal ke app/ui/modals.py, eliminasi file font redundan (-876 KB), dan penutupan resources file handle secara deterministik.",
+        "description": "Audit menyeluruh kebenaran kode, penghapusan kode/aset tidak terpakai, modularisasi app/ui/modals.py, standardisasi komentar minimalis, serta perbaikan ASCII & CRLF pada launcher .bat.",
         "highlights": [
-            "Modularisasi seluruh jendela pop-up modal (About, ColumnMapper, UpdateNotification, ModernNotification) ke app/ui/modals.py.",
+            "Modularisasi seluruh jendela pop-up modal ke app/ui/modals.py dengan re-export backward-compatible.",
             "Pembersihan komentar WHAT dan section headers berlebih pada komponen antarmuka sesuai standar comment-rule.",
             "Eliminasi file font variabel yang tidak terpakai sehingga memangkas ukuran aset hingga 876 KB.",
             "Penutupan handle berkas Excel (openpyxl & pandas) secara deterministik untuk mencegah resource leak di Windows.",
-            "Pemeliharaan 100% atribusi resmi pengembang Danang Satria pada seluruh metadata, header, dan antarmuka.",
+            "Perbaikan format akhiran baris Windows CRLF dan ASCII murni pada script launcher dan auto-updater .bat.",
+        ],
+    },
+    {
+        "version": "1.11.0",
+        "date": "2026-11-19",
+        "title": "Standardisasi SemVer Timeline & Monotonic Version Guardrails",
+        "description": "Standardisasi kronologi Semantic Versioning (SemVer) menaik secara ketat hingga v1.11.0, penambahan validator anti-regresi versi (Monotonic Version Guard) di seluruh sistem, dan rilis konsolidasi stabil resmi.",
+        "highlights": [
+            "Standardisasi Semantic Versioning (SemVer) menaik secara ketat hingga v1.11.0 agar seluruh pengguna versi sebelumnya (v1.9.x maupun v1.10.0) langsung terdeteksi oleh Auto-Updater.",
+            "Penambahan mekanisme validasi anti-regresi versi (Monotonic Version Guard) pada registry versi, skrip bump versi, unit test, dan pipeline CI/CD GitHub Actions.",
+            "Konsolidasi seluruh pembaruan keamanan, notifikasi modern, tipografi Inter & Space Mono, modularisasi UI, serta perbaikan launcher Windows dalam satu rilis stabil.",
         ],
     },
 ]
@@ -199,3 +198,50 @@ def get_current_version() -> str:
     return "1.0.0"
 
 __version__ = get_current_version()
+
+def validate_version_registry(
+    registry: list[dict[str, Any]] | None = None,
+    current_version: str | None = None,
+) -> bool:
+    reg = registry if registry is not None else FEATURE_REGISTRY
+    cur_ver = current_version if current_version is not None else __version__
+
+    if not reg:
+        raise ValueError("FEATURE_REGISTRY tidak boleh kosong.")
+
+    semver_pattern = re.compile(r"^\d+\.\d+\.\d+$")
+    seen_versions: set[str] = set()
+    prev_tuple: tuple[int, ...] | None = None
+    prev_version_str: str | None = None
+
+    for i, entry in enumerate(reg):
+        ver_str = str(entry.get("version", "")).strip()
+        if not semver_pattern.match(ver_str):
+            raise ValueError(
+                f"Format versi tidak valid pada indeks {i}: '{ver_str}'. Wajib mengikuti pola SemVer mayor.minor.patch (contoh: 1.11.0)."
+            )
+
+        if ver_str in seen_versions:
+            raise ValueError(f"Ditemukan duplikasi versi SemVer pada registry: '{ver_str}'.")
+        seen_versions.add(ver_str)
+
+        curr_tuple = parse_version_tuple(ver_str)
+        if prev_tuple is not None and curr_tuple <= prev_tuple:
+            raise ValueError(
+                f"Regresi versi terdeteksi pada indeks {i}: 'v{ver_str}' tidak lebih besar dari versi sebelumnya 'v{prev_version_str}'. "
+                "Urutan FEATURE_REGISTRY wajib naik secara monotonik ketat."
+            )
+
+        prev_tuple = curr_tuple
+        prev_version_str = ver_str
+
+    last_ver = str(reg[-1].get("version", "")).strip()
+    if cur_ver != last_ver:
+        raise ValueError(
+            f"Versi aktif __version__ ('{cur_ver}') tidak cocok dengan entri terakhir FEATURE_REGISTRY ('{last_ver}')."
+        )
+
+    return True
+
+validate_version_registry()
+

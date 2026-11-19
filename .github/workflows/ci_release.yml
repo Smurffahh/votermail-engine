@@ -1,3 +1,6 @@
+# VoterMail Engine — High-Volume Word & Excel DPT Mail-Merge Automation
+# Created by Danang Satria (https://github.com/Smurffahh/votermail-engine)
+
 name: CI/CD Test, Build, & Auto-Release
 
 on:
@@ -48,6 +51,7 @@ jobs:
         shell: python
         run: |
           import os
+          import subprocess
           import sys
           from pathlib import Path
           sys.path.insert(0, str(Path.cwd()))
@@ -56,7 +60,34 @@ jobs:
               __author__,
               __repository__,
               FEATURE_REGISTRY,
+              parse_version_tuple,
+              validate_version_registry,
           )
+
+          validate_version_registry()
+          curr_tuple = parse_version_tuple(__version__)
+
+          try:
+              tag_out = subprocess.check_output(["git", "tag", "--list", "v*"], text=True)
+              existing_tags = [t.strip().lstrip("v") for t in tag_out.splitlines() if t.strip()]
+          except Exception as exc:
+              print(f"Catatan: Gagal memuat daftar git tag: {exc}")
+              existing_tags = []
+
+          highest_tag_tuple = (0, 0, 0)
+          highest_tag_str = ""
+          for t_str in existing_tags:
+              t_tuple = parse_version_tuple(t_str)
+              if t_tuple > highest_tag_tuple:
+                  highest_tag_tuple = t_tuple
+                  highest_tag_str = t_str
+
+          if highest_tag_tuple > (0, 0, 0) and curr_tuple < highest_tag_tuple:
+              print(
+                  f"FATAL: Regresi rilis terdeteksi! Versi aktif v{__version__} lebih kecil dari tag git tertinggi v{highest_tag_str}.",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
 
           zip_name = f"VoterMail_Engine_v{__version__}_Windows_x64_Portable.zip"
           zip_path = f"dist/{zip_name}"
