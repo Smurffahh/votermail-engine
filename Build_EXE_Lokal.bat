@@ -1,8 +1,10 @@
 @echo off
-chcp 65001 >nul
-title VoterMail Engine — Build Portable EXE Package
+setlocal
+set "PYTHONIOENCODING=utf-8"
+title VoterMail Engine - Build Portable EXE Package
+
 echo ========================================================
-echo       VoterMail Engine — Portable EXE Builder
+echo       VoterMail Engine - Portable EXE Builder
 echo              Created by Danang Satria
 echo ========================================================
 echo.

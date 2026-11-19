@@ -226,24 +226,27 @@ def download_and_apply_update(
         app_exe = app_dir / "VoterMail_Engine.exe"
 
         bat_path = TEMP_DIR / "_apply_update.bat"
-        bat_content = f"""@echo off
-chcp 65001 >nul
-echo Memasang pembaruan VoterMail Engine...
-ping 127.0.0.1 -n 3 >nul
-if exist "{source_dir}\\_internal" (
-    xcopy /E /Y /I "{source_dir}\\_internal" "{app_dir}\\_internal" >nul
-)
-if exist "{source_dir}\\VoterMail_Engine.exe" (
-    copy /Y "{source_dir}\\VoterMail_Engine.exe" "{app_dir}\\VoterMail_Engine.exe" >nul
-)
-if exist "{source_dir}\\PANDUAN_PANITIA.txt" (
-    copy /Y "{source_dir}\\PANDUAN_PANITIA.txt" "{app_dir}\\PANDUAN_PANITIA.txt" >nul
-)
-rmdir /S /Q "{staging_dir}" >nul
-start "" "{app_exe}"
-del "%~f0"
-"""
-        bat_path.write_text(bat_content, encoding="utf-8")
+        bat_lines = [
+            "@echo off",
+            "setlocal",
+            "echo Memasang pembaruan VoterMail Engine...",
+            "ping 127.0.0.1 -n 3 >nul",
+            f'if exist "{source_dir}\\_internal" (',
+            f'    xcopy /E /Y /I "{source_dir}\\_internal" "{app_dir}\\_internal" >nul',
+            ")",
+            f'if exist "{source_dir}\\VoterMail_Engine.exe" (',
+            f'    copy /Y "{source_dir}\\VoterMail_Engine.exe" "{app_dir}\\VoterMail_Engine.exe" >nul',
+            ")",
+            f'if exist "{source_dir}\\PANDUAN_PANITIA.txt" (',
+            f'    copy /Y "{source_dir}\\PANDUAN_PANITIA.txt" "{app_dir}\\PANDUAN_PANITIA.txt" >nul',
+            ")",
+            f'rmdir /S /Q "{staging_dir}" >nul',
+            f'start "" "{app_exe}"',
+            'del "%~f0"',
+            "",
+        ]
+        bat_content = "\r\n".join(bat_lines)
+        bat_path.write_bytes(bat_content.encode("ascii"))
 
         if progress_callback:
             progress_callback(total_size, total_size, "Pembaruan siap dipasang. Menjalankan installer...")

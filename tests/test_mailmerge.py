@@ -1509,5 +1509,60 @@ class TestMailMergeApp(unittest.TestCase):
         finally:
             root.destroy()
 
+    def test_37_batch_files_crlf_and_ascii_clean(self) -> None:
+        batch_files = ["Jalankan_VoterMail.bat", "Build_EXE_Lokal.bat"]
+        for bname in batch_files:
+            bpath = PROJECT_ROOT / bname
+            self.assertTrue(bpath.exists(), f"Batch launcher missing: {bname}")
+            raw = bpath.read_bytes()
+
+            self.assertFalse(raw.startswith(b"\xef\xbb\xbf"), f"{bname} contains UTF-8 BOM!")
+            self.assertIn(b"\r\n", raw, f"{bname} does not contain CRLF line endings!")
+            bare_lf = raw.replace(b"\r\n", b"")
+            self.assertNotIn(b"\n", bare_lf, f"{bname} contains bare LF line endings!")
+
+            try:
+                decoded = raw.decode("ascii")
+            except UnicodeDecodeError as exc:
+                self.fail(f"{bname} contains non-ASCII characters: {exc}")
+
+            self.assertNotIn("chcp 65001", decoded, f"{bname} should not use chcp 65001")
+            self.assertIn("PYTHONIOENCODING", decoded, f"{bname} should configure PYTHONIOENCODING")
+
+        gitattr_path = PROJECT_ROOT / ".gitattributes"
+        self.assertTrue(gitattr_path.exists(), ".gitattributes file is missing")
+        gitattr_text = gitattr_path.read_text(encoding="utf-8")
+        self.assertIn("*.bat text eol=crlf", gitattr_text)
+        self.assertIn("*.cmd text eol=crlf", gitattr_text)
+
+        # 6. Verify updater.py temporary batch script format
+        from app.config.settings import TEMP_DIR
+        test_source = TEMP_DIR / "test_stage"
+        test_app = TEMP_DIR / "test_app"
+        test_exe = test_app / "VoterMail_Engine.exe"
+        bat_lines = [
+            "@echo off",
+            "setlocal",
+            "echo Memasang pembaruan VoterMail Engine...",
+            "ping 127.0.0.1 -n 3 >nul",
+            f'if exist "{test_source}\\_internal" (',
+            f'    xcopy /E /Y /I "{test_source}\\_internal" "{test_app}\\_internal" >nul',
+            ")",
+            f'if exist "{test_source}\\VoterMail_Engine.exe" (',
+            f'    copy /Y "{test_source}\\VoterMail_Engine.exe" "{test_app}\\VoterMail_Engine.exe" >nul',
+            ")",
+            f'if exist "{test_source}\\PANDUAN_PANITIA.txt" (',
+            f'    copy /Y "{test_source}\\PANDUAN_PANITIA.txt" "{test_app}\\PANDUAN_PANITIA.txt" >nul',
+            ")",
+            f'rmdir /S /Q "{test_source}" >nul',
+            f'start "" "{test_exe}"',
+            'del "%~f0"',
+            "",
+        ]
+        sample_bat = "\r\n".join(bat_lines).encode("ascii")
+        self.assertIn(b"\r\n", sample_bat)
+        self.assertNotIn(b"\n", sample_bat.replace(b"\r\n", b""))
+        self.assertNotIn(b"chcp 65001", sample_bat)
+
 if __name__ == "__main__":
     unittest.main()

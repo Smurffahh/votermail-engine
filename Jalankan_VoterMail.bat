@@ -1,8 +1,10 @@
 @echo off
-chcp 65001 >nul
-title VoterMail Engine — Launcher
+setlocal
+set "PYTHONIOENCODING=utf-8"
+title VoterMail Engine - Created by Danang Satria
+
 echo ========================================================
-echo       VoterMail Engine — Otomasi Mail-Merge C6
+echo            VoterMail Engine - Mail Merge DPT
 echo              Created by Danang Satria
 echo ========================================================
 echo.

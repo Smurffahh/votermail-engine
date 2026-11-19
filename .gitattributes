@@ -1,0 +1,8 @@
+# Force Windows batch scripts to always use CRLF line endings
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Source and documentation files use LF
+*.py  text eol=lf
+*.md  text eol=lf
+*.yml text eol=lf
