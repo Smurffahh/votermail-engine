@@ -134,6 +134,8 @@ def main() -> None:
             )
         except Exception:
             pass
+    from app.config.theme import load_bundled_fonts
+    load_bundled_fonts()
     from app.ui.main_window import MainWindow
 
     app = MainWindow()

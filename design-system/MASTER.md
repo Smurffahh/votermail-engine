@@ -16,9 +16,10 @@ Dokumentasi arsitektur desain visual, token warna, tipografi, dan disiplin antar
    - Elemen Mikro (Badge Status, Indikator Versi, Checkbox): `corner_radius = 6px`
 3. **Structural Hairline Borders**
    Gunakan garis batas struktural tipis `1px` (`#2E3C56` pada Dark Mode, `#BFBDBD` pada Light Mode) untuk memisahkan hierarki kartu, bukan bayangan tebal (*heavy drop-shadows*) yang membuat antarmuka kotor.
-4. **Disiplin Tipografi & Tabular Numbers**
-   - Font Antarmuka Utama: `Segoe UI` (bobot 700 untuk judul seksi, 600 untuk subjudul/kontrol, 400 untuk body teks). Seluruh subjudul dan header tabel menggunakan *Sentence case* alami (tanpa ALL CAPS yang kaku).
-   - Font Numerik & Log Monospace: `Consolas` untuk nomor versi, jumlah pemilih, persentase progres, durasi waktu, dan log audit (`tabular-nums` demi mencegah pergeseran/jitter saat angka berubah dinamis).
+4. **Disiplin Tipografi & Tabular Numbers (Inter & Space Mono)**
+   - **Primary UI Font (`--font-sans`)**: `Inter` (Google Fonts, bobot 700 untuk judul seksi, 600 untuk subjudul/kontrol, 400 untuk body teks). Seluruh subjudul dan header tabel menggunakan *Sentence case* alami (tanpa ALL CAPS yang kaku) dengan kejernihan rendering teks tinggi.
+   - **Log & Tabular Metric Font (`--font-mono`)**: `Space Mono` (Google Fonts) untuk nomor versi, jumlah pemilih, persentase progres, durasi waktu (Live Stopwatch), tabel pratinjau pemilih (kolom No, Usia, badge Wilayah), dan log audit (`tabular-nums` demi mencegah pergeseran/jitter saat angka berubah dinamis).
+   - **Pemuat Font Mandiri (Embedded Offline Font Loader)**: Pemuatan privat ke memori proses Windows (`ctypes.windll.gdi32.AddFontResourceExW(path, 0x10, 0)` / `FR_PRIVATE`) dan `ctk.FontManager.load_font(path)` dari direktori lokal `app/assets/fonts/` agar aplikasi `.EXE` portabel tetap menampilkan font Inter dan Space Mono secara konsisten di komputer mana pun tanpa hak Administrator.
 5. **Anti-AI Slop & UX Copy Discipline**
    - Dilarang menggunakan gradien ungu-biru generik.
    - Dilarang menggunakan teks copywriting klise ("solusi revolusioner", "senantiasa", "menyelami").
@@ -136,7 +137,7 @@ Tepat di bawah baris kontrol filter, `FilterStatusBanner` menyajikan umpan balik
 
 ## 7. Arsitektur Monospace Log Sistem & Syntax Highlighting
 
-Sistem log pada tab **Log Sistem** dan **Hasil Cek PDF** menggunakan tata letak monospace berlebar tetap (`Consolas` 11pt) dengan format terstandarisasi:
+Sistem log pada tab **Log Sistem** dan **Hasil Cek PDF** menggunakan tata letak monospace berlebar tetap (`Space Mono` 11pt, dengan jarak baris `spacing1=2, spacing3=2`) dengan format terstandarisasi:
 ```text
 HH:MM:SS │ KATEGORI   │ Pesan aktivitas sistem
 ```

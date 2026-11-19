@@ -33,6 +33,12 @@ def ensure_assets() -> None:
         from scripts.generate_icon import generate_votermail_icon
         generate_votermail_icon(ASSETS_DIR)
 
+    fonts_dir = ASSETS_DIR / "fonts"
+    if not fonts_dir.exists() or len(list(fonts_dir.glob("*.ttf"))) < 8:
+        print("[*] Menyiapkan aset font offline via scripts/setup_fonts.py...")
+        from scripts.setup_fonts import setup_bundled_fonts
+        setup_bundled_fonts(fonts_dir)
+
 def clean_build_artifacts() -> None:
     print(f"[*] Membersihkan folder artefak lama (build/, dist/)...")
     if BUILD_DIR.exists():
@@ -116,6 +122,14 @@ def prepare_distribution_tree() -> None:
     if ICON_PNG_PATH.exists():
         shutil.copy2(ICON_PNG_PATH, dist_assets / "votermail.png")
         print(f"  [+] Menyalin cadangan PNG logo aplikasi: {dist_assets / 'votermail.png'}")
+
+    dist_fonts = dist_assets / "fonts"
+    dist_fonts.mkdir(parents=True, exist_ok=True)
+    src_fonts = ASSETS_DIR / "fonts"
+    if src_fonts.exists():
+        for ttf in src_fonts.glob("*.ttf"):
+            shutil.copy2(ttf, dist_fonts / ttf.name)
+        print(f"  [+] Menyalin cadangan font offline ke dist: {dist_fonts}")
 
     guide_path = PACKAGE_DIR / "PANDUAN_PANITIA.txt"
     guide_content = f"""================================================================================

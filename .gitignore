@@ -19,6 +19,7 @@ data/output/*
 *.png
 !app/assets/*.png
 !app/assets/*.ico
+!app/assets/fonts/*.ttf
 
 # Temporary Staged Documents & Working Directories
 data/temp/*

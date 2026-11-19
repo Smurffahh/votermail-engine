@@ -15,6 +15,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+py_base = Path(sys.executable).parent
+tcl_dir = py_base / "tcl" / "tcl8.6"
+tk_dir = py_base / "tcl" / "tk8.6"
+if tcl_dir.exists():
+    os.environ["TCL_LIBRARY"] = str(tcl_dir)
+if tk_dir.exists():
+    os.environ["TK_LIBRARY"] = str(tk_dir)
+
 from pypdf import PdfReader
 
 @functools.lru_cache(maxsize=1)
@@ -1444,6 +1452,60 @@ class TestMailMergeApp(unittest.TestCase):
 
             btn_clear.pack_forget()
             self.assertEqual(btn_clear.winfo_manager(), "")
+        finally:
+            root.destroy()
+
+    def test_36_typography_inter_and_space_mono_fonts(self) -> None:
+        import customtkinter as ctk
+        from app.config.theme import (
+            FONT_FAMILY_UI,
+            FONT_FAMILY_MONO,
+            load_bundled_fonts,
+            get_ui_font,
+            get_mono_font,
+            DARK_THEME,
+            LIGHT_THEME,
+        )
+        from app.config.settings import FONTS_DIR
+
+        self.assertEqual(FONT_FAMILY_UI, "Inter")
+        self.assertEqual(FONT_FAMILY_MONO, "Space Mono")
+        self.assertEqual(DARK_THEME.font_family_main, "Inter")
+        self.assertEqual(DARK_THEME.font_family_mono, "Space Mono")
+        self.assertEqual(LIGHT_THEME.font_family_main, "Inter")
+        self.assertEqual(LIGHT_THEME.font_family_mono, "Space Mono")
+
+        self.assertTrue(FONTS_DIR.exists())
+        required_fonts = [
+            "Inter-Regular.ttf",
+            "Inter-Medium.ttf",
+            "Inter-SemiBold.ttf",
+            "Inter-Bold.ttf",
+            "SpaceMono-Regular.ttf",
+            "SpaceMono-Bold.ttf",
+            "SpaceMono-Italic.ttf",
+            "SpaceMono-BoldItalic.ttf",
+        ]
+        for font_name in required_fonts:
+            font_path = FONTS_DIR / font_name
+            self.assertTrue(font_path.exists(), f"Font file missing: {font_name}")
+            size_kb = font_path.stat().st_size / 1024
+            self.assertGreater(size_kb, 10, f"Font file {font_name} is too small: {size_kb:.2f} KB")
+
+        root = ctk.CTk()
+        root.withdraw()
+        try:
+            loaded = load_bundled_fonts()
+            self.assertIsInstance(loaded, int)
+
+            ui_font = get_ui_font(size=14, weight="bold")
+            self.assertEqual(ui_font.cget("family"), "Inter")
+            self.assertEqual(ui_font.cget("size"), 14)
+            self.assertEqual(ui_font.cget("weight"), "bold")
+
+            mono_font = get_mono_font(size=11)
+            self.assertEqual(mono_font.cget("family"), "Space Mono")
+            self.assertEqual(mono_font.cget("size"), 11)
         finally:
             root.destroy()
 

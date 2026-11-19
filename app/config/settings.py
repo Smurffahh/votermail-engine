@@ -21,6 +21,7 @@ else:
     BUNDLE_DIR = BASE_DIR
 
 ASSETS_DIR = BUNDLE_DIR / "app" / "assets"
+FONTS_DIR = ASSETS_DIR / "fonts"
 APP_ICON_ICO = ASSETS_DIR / "votermail.ico"
 APP_ICON_PNG = ASSETS_DIR / "votermail.png"
 

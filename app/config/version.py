@@ -155,6 +155,18 @@ FEATURE_REGISTRY: list[dict[str, Any]] = [
             "Tombol 'Bersihkan' log sekarang kontekstual dan hanya muncul ketika tab Log Sistem aktif.",
         ],
     },
+    {
+        "version": "1.9.3",
+        "date": "2026-11-19",
+        "title": "Migrasi Tipografi ke Inter & Space Mono dengan Pemuat Font Offline",
+        "description": "Pembaruan tipografi antarmuka menggunakan font Inter pada seluruh elemen UI dan font Space Mono pada Log Sistem serta angka metrik, dilengkapi pemuat font offline otomatis.",
+        "highlights": [
+            "Penerapan font Inter sebagai font utama seluruh komponen antarmuka antarmuka (UI Sans).",
+            "Penerapan font Space Mono untuk log sistem, detail angka audit, dan angka metrik tabular.",
+            "Pemuat font offline otomatis (load_bundled_fonts) mendaftarkan file .ttf ke memori privat Windows GDI (FR_PRIVATE).",
+            "Penyelarasan ruang horizontal kolom dan kontrol anti-clipping untuk karakter Space Mono yang lebih tegas.",
+        ],
+    },
 ]
 
 def get_latest_release_entry() -> dict[str, Any]:

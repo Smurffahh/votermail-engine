@@ -1014,9 +1014,9 @@ class VoterPreviewTable(ctk.CTkFrame):
         frame.grid_columnconfigure(0, weight=0, minsize=48)
         frame.grid_columnconfigure(1, weight=2, minsize=190)
         frame.grid_columnconfigure(2, weight=0, minsize=95)
-        frame.grid_columnconfigure(3, weight=0, minsize=80)
+        frame.grid_columnconfigure(3, weight=0, minsize=90)
         frame.grid_columnconfigure(4, weight=4)
-        frame.grid_columnconfigure(5, weight=0, minsize=95)
+        frame.grid_columnconfigure(5, weight=0, minsize=100)
 
     def _build_ui(self) -> None:
         # 1. Sub-Header Status Bar

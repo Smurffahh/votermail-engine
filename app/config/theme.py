@@ -4,7 +4,15 @@
 __author__ = "Danang Satria"
 
 from dataclasses import dataclass
+from pathlib import Path
+import sys
 from typing import Literal
+import customtkinter as ctk
+
+from app.config.settings import FONTS_DIR
+
+FONT_FAMILY_UI = "Inter"
+FONT_FAMILY_MONO = "Space Mono"
 
 # Native Dual-Tuple Color Tokens (LIGHT_HEX, DARK_HEX) for CustomTkinter
 # Skema Warna: DaisyUI "garden" (Light Mode) & DaisyUI "night" (Dark Mode)
@@ -77,8 +85,8 @@ class ThemeTokens:
     corner_radius_inner: int = 8
     corner_radius_control: int = 8
     corner_radius_badge: int = 6
-    font_family_main: str = "Segoe UI"
-    font_family_mono: str = "Consolas"
+    font_family_main: str = FONT_FAMILY_UI
+    font_family_mono: str = FONT_FAMILY_MONO
 
     def __getitem__(self, item: str) -> tuple[str, str]:
         if item in THEME:
@@ -195,3 +203,41 @@ LIGHT_THEME = ThemeTokens(name="Light")
 
 def get_theme(mode: Literal["Dark", "Light"] = "Dark") -> ThemeTokens:
     return DARK_THEME if str(mode).lower() == "dark" else LIGHT_THEME
+
+_FONTS_LOADED = False
+
+def load_bundled_fonts() -> int:
+    """Memuat file font offline (.ttf) dari FONTS_DIR ke CustomTkinter dan Windows GDI secara privat (FR_PRIVATE)."""
+    global _FONTS_LOADED
+    if _FONTS_LOADED:
+        return 0
+
+    loaded_count = 0
+    if not FONTS_DIR.exists():
+        return 0
+
+    for ttf_path in FONTS_DIR.glob("*.ttf"):
+        try:
+            if hasattr(ctk, "FontManager") and hasattr(ctk.FontManager, "load_font"):
+                ctk.FontManager.load_font(str(ttf_path))
+
+            if sys.platform == "win32":
+                try:
+                    import ctypes
+                    ctypes.windll.gdi32.AddFontResourceExW(str(ttf_path.resolve()), 0x10, 0)
+                except Exception:
+                    pass
+            loaded_count += 1
+        except Exception:
+            pass
+
+    _FONTS_LOADED = True
+    return loaded_count
+
+def get_ui_font(size: int = 12, weight: str = "normal", slant: str = "roman") -> ctk.CTkFont:
+    """Mengembalikan CTkFont untuk antarmuka pengguna berbasis font Inter."""
+    return ctk.CTkFont(family=FONT_FAMILY_UI, size=size, weight=weight, slant=slant)
+
+def get_mono_font(size: int = 12, weight: str = "normal", slant: str = "roman") -> ctk.CTkFont:
+    """Mengembalikan CTkFont untuk log dan metrik tabular berbasis font Space Mono."""
+    return ctk.CTkFont(family=FONT_FAMILY_MONO, size=size, weight=weight, slant=slant)

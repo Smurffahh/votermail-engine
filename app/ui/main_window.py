@@ -32,7 +32,16 @@ from app.config.settings import (
     FILTER_MODE_OPTIONS,
     DEFAULT_FILTER_MODE,
 )
-from app.config.theme import DARK_THEME, LIGHT_THEME, ThemeTokens, get_theme, THEME
+from app.config.theme import (
+    DARK_THEME,
+    LIGHT_THEME,
+    ThemeTokens,
+    get_theme,
+    THEME,
+    load_bundled_fonts,
+    FONT_FAMILY_UI,
+    FONT_FAMILY_MONO,
+)
 from app.config.version import (
     __app_name__,
     __author__,
@@ -144,6 +153,7 @@ def format_voter_preview_table(samples: list[str]) -> list[str]:
 
 class MainWindow(ctk.CTk):
     def __init__(self) -> None:
+        load_bundled_fonts()
         if sys.platform == "win32":
             try:
                 import ctypes
@@ -827,7 +837,7 @@ class MainWindow(ctk.CTk):
         self.time_label = ctk.CTkLabel(
             stats_row,
             text="Waktu Berjalan: 00:00",
-            font=ctk.CTkFont(family="Consolas", size=12),
+            font=ctk.CTkFont(family=self.theme.font_family_mono, size=11, weight="bold"),
             text_color=THEME["text_secondary"],
         )
         self.time_label.pack(side="right")
@@ -916,6 +926,11 @@ class MainWindow(ctk.CTk):
         )
 
         self.voter_table.pack(fill="both", expand=True)
+        try:
+            self.audit_textbox._textbox.configure(spacing1=2, spacing3=2)
+            self.log_textbox._textbox.configure(spacing1=2, spacing3=2)
+        except Exception:
+            pass
         self._apply_log_tag_styles()
 
     def _browse_word_file(self) -> None:
