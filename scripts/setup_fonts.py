@@ -28,7 +28,6 @@ INTER_TARGET_FILES = {
     "extras/ttf/Inter-SemiBold.ttf": "Inter-SemiBold.ttf",
     "extras/ttf/Inter-Bold.ttf": "Inter-Bold.ttf",
 }
-INTER_VARIABLE_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf"
 
 def download_file(url: str, dest_path: Path, min_bytes: int = 10240) -> bool:
     if dest_path.exists() and dest_path.stat().st_size >= min_bytes:
@@ -71,13 +70,6 @@ def setup_inter(target_dir: Path) -> None:
                     print(f"  [✓] Berhasil diekstrak: {out_name} ({len(data):,} bytes)")
     else:
         print("  [✓] Seluruh varian statis Inter sudah tersedia.")
-
-    var_font_path = target_dir / "Inter-VariableFont_opsz,wght.ttf"
-    if not var_font_path.exists() or var_font_path.stat().st_size < 10240:
-        try:
-            download_file(INTER_VARIABLE_URL, var_font_path)
-        except Exception as e:
-            print(f"  [!] Catatan: Font variabel opsional dilewati ({e})")
 
 def setup_bundled_fonts(target_dir: Path | None = None) -> Path:
     dest = target_dir or FONTS_DIR

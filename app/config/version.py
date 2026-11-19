@@ -167,6 +167,19 @@ FEATURE_REGISTRY: list[dict[str, Any]] = [
             "Penyelarasan ruang horizontal kolom dan kontrol anti-clipping untuk karakter Space Mono yang lebih tegas.",
         ],
     },
+    {
+        "version": "1.9.4",
+        "date": "2026-11-19",
+        "title": "Audit Kebersihan Kode, Modularisasi Modal UI, & Efisiensi Aset",
+        "description": "Audit kebenaran kode mendalam, pembersihan kode mati & komentar berlebih, modularisasi komponen modal ke app/ui/modals.py, eliminasi file font redundan (-876 KB), dan penutupan resources file handle secara deterministik.",
+        "highlights": [
+            "Modularisasi seluruh jendela pop-up modal (About, ColumnMapper, UpdateNotification, ModernNotification) ke app/ui/modals.py.",
+            "Pembersihan komentar WHAT dan section headers berlebih pada komponen antarmuka sesuai standar comment-rule.",
+            "Eliminasi file font variabel yang tidak terpakai sehingga memangkas ukuran aset hingga 876 KB.",
+            "Penutupan handle berkas Excel (openpyxl & pandas) secara deterministik untuk mencegah resource leak di Windows.",
+            "Pemeliharaan 100% atribusi resmi pengembang Danang Satria pada seluruh metadata, header, dan antarmuka.",
+        ],
+    },
 ]
 
 def get_latest_release_entry() -> dict[str, Any]:

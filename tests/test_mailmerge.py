@@ -23,6 +23,18 @@ if tcl_dir.exists():
 if tk_dir.exists():
     os.environ["TK_LIBRARY"] = str(tk_dir)
 
+import time
+
+def create_test_ctk_root() -> Any:
+    import customtkinter as ctk
+    for attempt in range(4):
+        try:
+            return ctk.CTk()
+        except Exception:
+            if attempt == 3:
+                raise
+            time.sleep(0.3)
+
 from pypdf import PdfReader
 
 @functools.lru_cache(maxsize=1)
@@ -1234,7 +1246,7 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertIn("tidak merespons", res_com["summary"])
 
         # 4. ModernNotificationModal & InAppToastBanner headless test
-        root = ctk.CTk()
+        root = create_test_ctk_root()
         root.withdraw()
         try:
             theme = ThemeTokens()
@@ -1287,7 +1299,7 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertEqual(theme_dark.corner_radius_badge, 6)
 
         # 2. FilterStatusBanner states verification
-        root = ctk.CTk()
+        root = create_test_ctk_root()
         root.withdraw()
         try:
             banner = FilterStatusBanner(root, theme=theme_dark)
@@ -1353,7 +1365,7 @@ class TestMailMergeApp(unittest.TestCase):
         from app.config.theme import LIGHT_THEME, DARK_THEME
         from app.config.settings import DEFAULT_ADDRESS_FORMAT
 
-        root = ctk.CTk()
+        root = create_test_ctk_root()
         root.withdraw()
         try:
             table = VoterPreviewTable(root, LIGHT_THEME)
@@ -1492,7 +1504,7 @@ class TestMailMergeApp(unittest.TestCase):
             size_kb = font_path.stat().st_size / 1024
             self.assertGreater(size_kb, 10, f"Font file {font_name} is too small: {size_kb:.2f} KB")
 
-        root = ctk.CTk()
+        root = create_test_ctk_root()
         root.withdraw()
         try:
             loaded = load_bundled_fonts()
@@ -1563,6 +1575,43 @@ class TestMailMergeApp(unittest.TestCase):
         self.assertIn(b"\r\n", sample_bat)
         self.assertNotIn(b"\n", sample_bat.replace(b"\r\n", b""))
         self.assertNotIn(b"chcp 65001", sample_bat)
+
+    def test_38_ui_modularization_modals_and_comment_hygiene(self) -> None:
+        from app.config.version import __version__, FEATURE_REGISTRY, __author__
+        from app.config.settings import FONTS_DIR
+        import app.ui.components as comp
+        import app.ui.modals as modals
+
+        self.assertEqual(__version__, "1.9.4")
+        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.9.4")
+        self.assertEqual(__author__, "Danang Satria")
+
+        # Verify modals and helpers exist in modals.py and re-exported in components.py
+        for attr in ["AboutModal", "ColumnMapperModal", "UpdateNotificationModal", "ModernNotificationModal", "get_col_letter", "apply_window_icon"]:
+            self.assertTrue(hasattr(modals, attr), f"Missing {attr} in app.ui.modals")
+            self.assertTrue(hasattr(comp, attr), f"Missing {attr} in app.ui.components re-export")
+            self.assertIs(getattr(modals, attr), getattr(comp, attr), f"{attr} mismatch between modules")
+
+        # Verify author credits preservation
+        self.assertEqual(getattr(modals, "__author__", ""), "Danang Satria")
+        self.assertEqual(getattr(comp, "__author__", ""), "Danang Satria")
+
+        # Verify font asset hygiene (variable font eliminated, static fonts preserved)
+        redundant_var_font = FONTS_DIR / "Inter-VariableFont_opsz,wght.ttf"
+        self.assertFalse(redundant_var_font.exists(), "Inter-VariableFont_opsz,wght.ttf should be deleted to save 876 KB")
+
+        expected_static_fonts = [
+            "Inter-Regular.ttf",
+            "Inter-Medium.ttf",
+            "Inter-SemiBold.ttf",
+            "Inter-Bold.ttf",
+            "SpaceMono-Regular.ttf",
+            "SpaceMono-Bold.ttf",
+            "SpaceMono-Italic.ttf",
+            "SpaceMono-BoldItalic.ttf",
+        ]
+        for fname in expected_static_fonts:
+            self.assertTrue((FONTS_DIR / fname).exists(), f"Static font asset missing: {fname}")
 
 if __name__ == "__main__":
     unittest.main()

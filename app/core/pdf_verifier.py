@@ -234,4 +234,5 @@ def export_audit_excel(audit_results: list[VerificationResult], output_dir: str)
         ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
 
     wb.save(report_path)
+    wb.close()
     return str(report_path)

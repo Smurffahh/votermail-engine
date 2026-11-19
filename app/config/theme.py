@@ -17,54 +17,45 @@ FONT_FAMILY_MONO = "Space Mono"
 # Native Dual-Tuple Color Tokens (LIGHT_HEX, DARK_HEX) for CustomTkinter
 # Skema Warna: DaisyUI "garden" (Light Mode) & DaisyUI "night" (Dark Mode)
 THEME: dict[str, tuple[str, str]] = {
-    # Background & Surfaces (DaisyUI Garden | DaisyUI Night)
-    "bg_root": ("#D4D2D2", "#090E1A"),          # Base-200 (Garden) | Base-200 (Night)
-    "bg_card": ("#E9E7E7", "#0F172A"),          # Base-100 (Garden) | Base-100 (Night)
-    "bg_surface": ("#F5F4F4", "#1E293B"),       # Lighter Base-100 / Inner | Slate 800
-    "bg_elevated": ("#DFDDDD", "#162033"),      # Kotak Progress & Header Tabel
-    "bg_hover": ("#D0CECE", "#26354D"),         # Hover highlight row
+    "bg_root": ("#D4D2D2", "#090E1A"),
+    "bg_card": ("#E9E7E7", "#0F172A"),
+    "bg_surface": ("#F5F4F4", "#1E293B"),
+    "bg_elevated": ("#DFDDDD", "#162033"),
+    "bg_hover": ("#D0CECE", "#26354D"),
 
-    # Borders & Dividers
-    "border_card": ("#BFBDBD", "#2E3C56"),      # Hairline border struktural 1px kartu utama
-    "border_surface": ("#B2AFAF", "#334460"),   # Border sub-kartu, tombol & input
-    "border_subtle": ("#BFBDBD", "#2E3C56"),    # Alias kompatibilitas
+    "border_card": ("#BFBDBD", "#2E3C56"),
+    "border_surface": ("#B2AFAF", "#334460"),
+    "border_subtle": ("#BFBDBD", "#2E3C56"),
 
-    # Typography (WCAG AA Compliant)
-    "text_primary": ("#100F0F", "#C8CAD0"),     # Deep near-black (Garden) | Muted soft white (Night)
-    "text_secondary": ("#3D3A3A", "#94A3B8"),   # Slate secondary (Garden) | Slate 400 (Night)
-    "text_muted": ("#6E6A6A", "#64748B"),       # Slate muted (Garden) | Slate 500 (Night)
+    "text_primary": ("#100F0F", "#C8CAD0"),
+    "text_secondary": ("#3D3A3A", "#94A3B8"),
+    "text_muted": ("#6E6A6A", "#64748B"),
 
-    # Secondary Interactive Buttons (DaisyUI Garden Neutral/Rose | DaisyUI Night Indigo)
     "btn_secondary_bg": ("#DCDADA", "#1E293B"),
     "btn_secondary_hover": ("#CECBCB", "#334155"),
     "btn_secondary_border": ("#B2AFAF", "#475569"),
     "btn_secondary_text": ("#100F0F", "#E2E8F0"),
 
-    # Soft Accent Buttons / Secondary CTA ("Pratinjau 1 Halaman" & "Pilih File")
-    "btn_accent_soft_bg": ("#E8D6DD", "#1E1F3B"),      # Garden rose soft | Night indigo soft
+    "btn_accent_soft_bg": ("#E8D6DD", "#1E1F3B"),
     "btn_accent_soft_hover": ("#D9C0CB", "#2B2D54"),
     "btn_accent_soft_border": ("#8E4162", "#818CF8"),
     "btn_accent_soft_text": ("#8E4162", "#818CF8"),
 
-    # Neutral / Utility Buttons ("Bersihkan", "Ubah Folder")
     "btn_neutral_bg": ("#291E00", "#1E293B"),
     "btn_neutral_hover": ("#3D2D00", "#334155"),
     "btn_neutral_border": ("#1A1300", "#334155"),
     "btn_neutral_text": ("#E9E7E7", "#CDD0D6"),
 
-    # Primary CTA Button ("Mulai Buat Surat PDF")
-    "btn_primary_bg": ("#FE0075", "#38BDF8"),          # Garden primary rose-pink | Night primary sky blue
+    "btn_primary_bg": ("#FE0075", "#38BDF8"),
     "btn_primary_hover": ("#D90064", "#0EA5E9"),
     "btn_primary_text": ("#FFFFFF", "#001019"),
 
-    # Cancel / Danger Button
     "btn_danger_bg": ("#FFE4E6", "#311018"),
     "btn_danger_hover": ("#FECDD3", "#4A1824"),
     "btn_danger_text": ("#C81E2B", "#FB7185"),
     "btn_disabled_bg": ("#DCDADA", "#162033"),
     "btn_disabled_text": ("#8F8B8B", "#4B5563"),
 
-    # Status Badges & Accents
     "status_ready_bg": ("#D1FAE5", "#0D2E2B"),
     "status_ready_text": ("#007A4F", "#2DD4BF"),
     "status_warn_bg": ("#FEF3C7", "#2E2410"),

@@ -670,7 +670,10 @@ def scan_and_validate_excel(
             ],
         )
 
-    xl = pd.ExcelFile(file_path)
+    with pd.ExcelFile(file_path) as xl:
+        sheet_names = list(xl.sheet_names)
+        raw_dfs = {s: xl.parse(sheet_name=s, header=None, dtype=str, keep_default_na=False) for s in sheet_names}
+
     summaries: list[SheetScanSummary] = []
     total_all_voters = 0
     total_all_pages = 0
@@ -681,8 +684,8 @@ def scan_and_validate_excel(
     top_col_mapping: dict[str, int] = {}
     top_available_cols: list[tuple[int, str]] = []
 
-    for sheet_name in xl.sheet_names:
-        df = pd.read_excel(file_path, sheet_name=sheet_name, header=None, dtype=str, keep_default_na=False)
+    for sheet_name in sheet_names:
+        df = raw_dfs[sheet_name]
         wilayah_name = _find_wilayah_text(df, sheet_name)
 
         if any(k in sheet_name.lower() for k in ("rekap", "summary", "cover", "petunjuk", "instruksi")):

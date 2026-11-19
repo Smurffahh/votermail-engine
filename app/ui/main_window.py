@@ -91,12 +91,14 @@ from app.ui.components import (
     VoterPreviewTable,
     StatusBadge,
     FilterStatusBanner,
+    InAppToastBanner,
+)
+from app.ui.modals import (
+    apply_window_icon,
     AboutModal,
     ColumnMapperModal,
-    UpdateNotificationModal,
     ModernNotificationModal,
-    InAppToastBanner,
-    apply_window_icon,
+    UpdateNotificationModal,
 )
 
 def format_elapsed_time(seconds: float) -> str:
@@ -255,7 +257,6 @@ class MainWindow(ctk.CTk):
         self.destroy()
 
     def _build_ui(self) -> None:
-        # Header Container
         self.header_frame = ctk.CTkFrame(
             self,
             fg_color=THEME["bg_card"],
@@ -360,7 +361,6 @@ class MainWindow(ctk.CTk):
             text_color=THEME["status_ready_text"],
         ).pack(padx=10, pady=5)
 
-        # Footer Bar: Author Credits & Quick Links
         self.footer_frame = ctk.CTkFrame(
             self,
             fg_color=THEME["bg_card"],
@@ -395,19 +395,15 @@ class MainWindow(ctk.CTk):
         lbl_footer_sec.pack(side="left")
         lbl_footer_sec.bind("<Button-1>", lambda _: webbrowser.open(__repository__))
 
-        # In-App Non-Intrusive Toast Banner
         self.toast_banner = InAppToastBanner(self, theme=self.theme)
 
-        # Main Workspace Container: 2-Column Responsive Layout without nested outer scrollbars
         self.main_body = ctk.CTkFrame(self, fg_color=THEME["bg_root"])
         self.main_body.pack(fill="both", expand=True, padx=14, pady=(10, 6))
 
-        # Left Column (approx 46% width): Source Preparation & Kadus Selection
         self.left_col = ctk.CTkFrame(self.main_body, fg_color="transparent", width=590)
         self.left_col.pack(side="left", fill="both", expand=False, padx=(0, 10))
         self.left_col.pack_propagate(False)
 
-        # Right Column (approx 54% width): Output Settings, Mailing Engine, Live Logs & Preview Table
         self.right_col = ctk.CTkFrame(self.main_body, fg_color="transparent")
         self.right_col.pack(side="right", fill="both", expand=True)
 
@@ -1135,7 +1131,6 @@ class MainWindow(ctk.CTk):
                 total_count=self.excel_scan_result.total_voters if self.excel_scan_result else 0,
             )
 
-        # Update FilterStatusBanner states
         if hasattr(self, "filter_status_banner"):
             if not is_mode_active:
                 self.btn_filter_reset.configure(state="disabled")
