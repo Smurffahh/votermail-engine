@@ -3,6 +3,9 @@
 
 __author__ = "Danang Satria"
 
+import os
+from pathlib import Path
+import sys
 import threading
 from typing import Any, Callable, Literal
 import webbrowser
@@ -683,8 +686,8 @@ class UpdateNotificationModal(ctk.CTkToplevel):
         latest_ver = update_info.get("latest_version", "Baru")
 
         self.title(f"Pembaruan Tersedia: VoterMail Engine v{latest_ver}")
-        self.geometry("580x530")
-        self.minsize(520, 460)
+        self.geometry("580x570")
+        self.minsize(520, 480)
         self.configure(fg_color=THEME["bg_root"])
         apply_window_icon(self)
 
@@ -698,8 +701,8 @@ class UpdateNotificationModal(ctk.CTkToplevel):
             mw = master.winfo_width()
             mh = master.winfo_height()
             x = mx + (mw - 580) // 2
-            y = my + (mh - 530) // 2
-            self.geometry(f"580x530+{max(0, x)}+{max(0, y)}")
+            y = my + (mh - 570) // 2
+            self.geometry(f"580x570+{max(0, x)}+{max(0, y)}")
         except Exception:
             pass
 
@@ -734,6 +737,17 @@ class UpdateNotificationModal(ctk.CTkToplevel):
 
         latest_ver = self.update_info.get("latest_version", "Baru")
         curr_ver = self.update_info.get("current_version", __version__)
+        update_mode = str(self.update_info.get("update_mode", "FULL")).upper()
+        dl_size = self.update_info.get("download_size_bytes", 0)
+
+        from app.core.updater import format_file_size
+        size_str = format_file_size(dl_size) if dl_size > 0 else ""
+        mode_badge_text = "Patch Cepat" if update_mode == "PATCH" else "Pembaruan Penuh"
+        badge_parts = [mode_badge_text]
+        if size_str:
+            badge_parts.append(size_str)
+        badge_parts.append("Verifikasi SHA-256 Otomatis")
+        full_badge_text = " • ".join(badge_parts)
 
         app_title = ctk.CTkLabel(
             title_row,
@@ -760,6 +774,22 @@ class UpdateNotificationModal(ctk.CTkToplevel):
             text_color=THEME["status_ready_text"],
         ).pack(padx=10, pady=4)
 
+        mode_pill = ctk.CTkFrame(
+            header_frame,
+            fg_color=THEME["bg_surface"],
+            border_color=THEME["border_surface"],
+            border_width=1,
+            corner_radius=6,
+        )
+        mode_pill.pack(anchor="w", pady=(6, 0))
+
+        ctk.CTkLabel(
+            mode_pill,
+            text=full_badge_text,
+            font=ctk.CTkFont(family=self.theme.font_family_mono, size=10, weight="bold"),
+            text_color=THEME["status_ready_text"] if update_mode == "PATCH" else THEME["btn_primary_bg"],
+        ).pack(padx=10, pady=3)
+
         notes_label = ctk.CTkLabel(
             content_frame,
             text=f"Apa yang Baru di Versi v{latest_ver}:",
@@ -777,7 +807,7 @@ class UpdateNotificationModal(ctk.CTkToplevel):
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
             text_color=THEME["text_secondary"],
             wrap="word",
-            height=140,
+            height=130,
         )
         self.notes_box.pack(fill="both", expand=True, padx=16, pady=(0, 8))
 
@@ -859,9 +889,14 @@ class UpdateNotificationModal(ctk.CTkToplevel):
         )
         self.btn_github.pack(side="left")
 
+        if size_str:
+            btn_update_label = f"Update Sekarang ({mode_badge_text} • {size_str})"
+        else:
+            btn_update_label = f"Update Sekarang ({mode_badge_text})"
+
         self.btn_update = ctk.CTkButton(
             self.btn_row,
-            text=f"Update Sekarang (v{latest_ver})",
+            text=btn_update_label,
             height=34,
             fg_color=THEME["btn_primary_bg"],
             hover_color=THEME["btn_primary_hover"],
@@ -873,6 +908,10 @@ class UpdateNotificationModal(ctk.CTkToplevel):
         self.btn_update.pack(side="right")
 
     def _start_update(self) -> None:
+        if hasattr(self.master, "_prepare_shutdown_for_update"):
+            if not self.master._prepare_shutdown_for_update():
+                return
+
         self.btn_later.configure(state="disabled")
         self.btn_github.configure(state="disabled")
         self.btn_update.configure(state="disabled", text="Memperbarui...")
@@ -881,16 +920,71 @@ class UpdateNotificationModal(ctk.CTkToplevel):
         self.progress_bar.set(0.0)
 
         def worker() -> None:
-            from app.core.updater import download_and_apply_update
+            is_frozen = getattr(sys, "frozen", False)
+            dl_url = self.update_info.get("download_url", "")
+            h_url = self.update_info.get("html_url", "")
+            expected_sha = self.update_info.get("expected_sha256", "")
+            update_mode = self.update_info.get("update_mode", "FULL")
+            target_ver = self.update_info.get("latest_version", "") or "latest"
 
             def prog_cb(cur: int, tot: int, msg: str) -> None:
                 pct = cur / tot if tot > 0 else 0.0
                 self.after(0, lambda: self._update_progress(pct, msg))
 
-            dl_url = self.update_info.get("download_url", "")
-            h_url = self.update_info.get("html_url", "")
-            ok, msg = download_and_apply_update(dl_url, html_url=h_url, progress_callback=prog_cb)
-            self.after(0, lambda: self._on_update_done(ok, msg))
+            if not is_frozen:
+                from app.core.updater import download_and_apply_update
+                ok, msg = download_and_apply_update(
+                    download_url=dl_url,
+                    html_url=h_url,
+                    progress_callback=prog_cb,
+                    expected_sha256=expected_sha,
+                    update_mode=update_mode,
+                    target_version=target_ver,
+                )
+                self.after(0, lambda: self._on_update_done(ok, msg))
+                return
+
+            from app.core.updater import stage_update_package, launch_detached_patcher
+
+            ok, msg, staging_dir, source_dir = stage_update_package(
+                download_url=dl_url,
+                target_version=target_ver,
+                expected_sha256=expected_sha,
+                update_mode=update_mode,
+                progress_callback=prog_cb,
+            )
+
+            if not ok or not staging_dir or not source_dir:
+                self.after(0, lambda: self._on_update_done(False, msg))
+                return
+
+            self.after(0, lambda: self._update_progress(1.0, "Meluncurkan proses pemasangan..."))
+
+            app_dir = Path(sys.executable).resolve().parent
+            exe_path = app_dir / "VoterMail_Engine.exe"
+            backup_dir = staging_dir.parent / "backup"
+
+            launch_ok, launch_msg = launch_detached_patcher(
+                parent_pid=os.getpid(),
+                app_dir=app_dir,
+                exe_path=exe_path,
+                staging_dir=source_dir,
+                backup_dir=backup_dir,
+                update_mode=update_mode,
+                target_version=target_ver,
+                icon_path=staging_dir.parent / "votermail.ico",
+                theme_mode=self.theme.name,
+                is_git=False,
+            )
+
+            if not launch_ok:
+                self.after(0, lambda: self._on_update_done(False, launch_msg))
+                return
+
+            if hasattr(self.master, "_shutdown_and_exit_for_update"):
+                self.after(200, self.master._shutdown_and_exit_for_update)
+            else:
+                self.after(200, lambda: os._exit(0))
 
         threading.Thread(target=worker, daemon=True).start()
 

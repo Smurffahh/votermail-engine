@@ -203,6 +203,19 @@ FEATURE_REGISTRY: list[dict[str, Any]] = [
             "Humanisasi teks status cetak dan badge keamanan 'Data Aman • 100% Offline' tanpa kata serba kapital berlebih.",
         ],
     },
+    {
+        "version": "1.12.0",
+        "date": "2026-11-22",
+        "title": "Sistem Smart In-Place Patch Updater, Graceful Shutdown, & Notifikasi Melayang",
+        "description": "Arsitektur auto-updater modular dengan dukungan paket Patch ringan (~4-5 MB), verifikasi integritas checksum SHA-256 otomatis, graceful shutdown dengan penanganan proses aktif, atomic backup dan auto-rollback, serta floating notification toast card berbasis Windows Forms di pojok kanan bawah layar.",
+        "highlights": [
+            "Deteksi cerdas perubahan dependensi (requirements.txt hash) untuk memilih mode unduh Patch (~4,2 MB) vs Full Portable (~31,5 MB).",
+            "Validasi integritas berkas via streaming SHA-256 dan perlindungan Zip-Slip sebelum ekstraksi.",
+            "Graceful shutdown terpadu dengan dialog konfirmasi jika proses pembuatan surat sedang berjalan dan penyimpanan konfigurasi otomatis.",
+            "Pemasangan terpisah tanpa jendela konsol hitam (detached PowerShell) dengan UI notifikasi melayang di pojok kanan bawah (Windows Forms Toast Card).",
+            "Atomic backup dan rollback otomatis jika proses penimpaan file gagal serta proteksi 100% data pemilih dan template.",
+        ],
+    },
 ]
 
 def get_latest_release_entry() -> dict[str, Any]:

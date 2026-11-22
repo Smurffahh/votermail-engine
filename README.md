@@ -6,7 +6,7 @@
 
 Aplikasi desktop Windows berbasis Python untuk mengotomatisasi pembuatan ribuan Surat Pemberitahuan Pemilih dari file Excel DPT menjadi 1 file PDF siap cetak per wilayah (Kadus/RW) menggunakan tata letak asli Microsoft Word.
 
-[![Version](https://img.shields.io/badge/version-1.11.2-10b981?style=flat-square)](https://github.com/Smurffahh/votermail-engine/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.12.0-10b981?style=flat-square)](https://github.com/Smurffahh/votermail-engine/releases/latest)
 [![Build & Release](https://img.shields.io/github/actions/workflow/status/Smurffahh/votermail-engine/ci_release.yml?branch=main&style=flat-square)](https://github.com/Smurffahh/votermail-engine/actions/workflows/ci_release.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%E2%80%A2%20MS%20Word%20COM-334155?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/license-MIT-64748b?style=flat-square)](LICENSE)
@@ -19,7 +19,7 @@ Aplikasi desktop Windows berbasis Python untuk mengotomatisasi pembuatan ribuan 
 - **Scanner Excel adaptif & kamus sinonim header.** Mengenali variasi nama kolom secara otomatis (`Nama Pemilih`, `Nama Warga`, `L/P`, `Gender`, `Usia`, `Domisili`). Tersedia tombol **Atur Kolom** untuk menyesuaikan pemetaan secara interaktif jika format tabel tidak standar.
 - **Dukungan template fleksibel.** Mendukung dokumen Word standar tanpa tag (injeksi otomatis), format 1 surat per lembar, serta dokumen dengan tag manual `{{...}}`. Kolom tambahan (seperti TPS atau Dusun) otomatis tersedia sebagai variabel mail-merge.
 - **Cetak ulang selektif (Nomor Urut, RT, & Nama).** Panitia dapat mencetak ulang surat panggilan khusus untuk nomor urut tertentu (misal `15, 42, 100-115`), RT tertentu, atau nama pemilih tertentu tanpa mencetak ulang seluruh satu dusun. Dilengkapi pratinjau instan hingga 25 pemilih dan penamaan file PDF yang aman tanpa menimpa file utama.
-- **Pemeriksa update otomatis & proteksi data.** Mengecek pembaruan versi baru saat aplikasi dibuka dengan modal notifikasi dan opsi *Update Sekarang* atau *Nanti Saja*, serta penginstal otomatis yang menjamin seluruh file data pemilih di folder `data/` tetap aman 100%.
+- **Sistem update in-place cerdas & proteksi data.** Mengecek pembaruan saat startup dengan opsi download paket Patch ringan (~4,2 MB) atau paket penuh, verifikasi integritas SHA-256 otomatis, graceful shutdown dengan konfirmasi proses aktif, rollback otomatis jika gagal, notifikasi melayang di pojok kanan bawah, dan proteksi 100% data pemilih di folder `data/`.
 - **Zero PII leak & keamanan privasi mutlak.** Kolom sensitif (NIK, Nomor KK, KTP) otomatis diblokir permanen dari pemetaan, memori aplikasi, dan file keluaran. Pemrosesan berjalan 100% lokal tanpa koneksi internet.
 - **Keutuhan desain Word & verifikasi PDF otomatis.** Mempertahankan elemen grafis/vektor dokumen Word asli (pita sudut `PANITIA PEMILIHAN` dan potongan Tanda Terima) serta memeriksa ulang jumlah halaman dan kecocokan data pemilih di setiap PDF yang dihasilkan.
 
@@ -29,7 +29,7 @@ Aplikasi desktop Windows berbasis Python untuk mengotomatisasi pembuatan ribuan 
 
 Panduan berikut ditujukan bagi operator pemilihan di lapangan tanpa perlu menginstal Python atau dependensi:
 
-1. **Unduh aplikasi**: Buka halaman **[Releases Terbaru](https://github.com/Smurffahh/votermail-engine/releases/latest)**, lalu unduh file `VoterMail_Engine_v1.11.2_Windows_x64_Portable.zip`.
+1. **Unduh aplikasi**: Buka halaman **[Releases Terbaru](https://github.com/Smurffahh/votermail-engine/releases/latest)**, lalu unduh file `VoterMail_Engine_v1.12.0_Windows_x64_Portable.zip`.
 2. **Ekstrak folder**: Ekstrak file `.zip` tersebut ke folder mana saja di komputer Windows Anda. Pastikan Microsoft Word telah terpasang di komputer.
 3. **Jalankan aplikasi**: Klik dua kali **`VoterMail_Engine.exe`**.
 4. **Proses cetak 3 langkah di dalam aplikasi**:

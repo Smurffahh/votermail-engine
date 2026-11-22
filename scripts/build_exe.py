@@ -3,6 +3,7 @@
 
 __author__ = "Danang Satria"
 
+import json
 import os
 from pathlib import Path
 import shutil
@@ -14,6 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
+from app.core.updater import compute_deps_hash, compute_file_sha256
 from app.config.version import (
     __app_name__,
     __author__,
@@ -26,8 +28,19 @@ PACKAGE_DIR = DIST_DIR / "VoterMail_Engine"
 ASSETS_DIR = BASE_DIR / "app" / "assets"
 ICON_ICO_PATH = ASSETS_DIR / "votermail.ico"
 ICON_PNG_PATH = ASSETS_DIR / "votermail.png"
+BUILD_META_PATH = ASSETS_DIR / "build_meta.json"
+
+def generate_build_meta() -> Path:
+    meta_data = {
+        "version": __version__,
+        "deps_hash": compute_deps_hash(BASE_DIR / "requirements.txt"),
+    }
+    BUILD_META_PATH.write_text(json.dumps(meta_data, indent=2), encoding="utf-8")
+    print(f"  [+] Menghasilkan metadata build: {BUILD_META_PATH.name} (deps_hash: {meta_data['deps_hash'][:8]}...)")
+    return BUILD_META_PATH
 
 def ensure_assets() -> None:
+    generate_build_meta()
     if not ICON_ICO_PATH.exists() or not ICON_PNG_PATH.exists():
         print("[*] Menghasilkan aset ikon aplikasi via scripts/generate_icon.py...")
         from scripts.generate_icon import generate_votermail_icon
@@ -122,6 +135,9 @@ def prepare_distribution_tree() -> None:
     if ICON_PNG_PATH.exists():
         shutil.copy2(ICON_PNG_PATH, dist_assets / "votermail.png")
         print(f"  [+] Menyalin cadangan PNG logo aplikasi: {dist_assets / 'votermail.png'}")
+    if BUILD_META_PATH.exists():
+        shutil.copy2(BUILD_META_PATH, dist_assets / "build_meta.json")
+        print(f"  [+] Menyalin metadata build ke dist: {dist_assets / 'build_meta.json'}")
 
     dist_fonts = dist_assets / "fonts"
     dist_fonts.mkdir(parents=True, exist_ok=True)
@@ -197,6 +213,73 @@ def create_portable_zip() -> Path:
     print(f"[✓] Paket portabel berhasil dirakit: {zip_path.name} ({size_mb:.2f} MB)")
     return zip_path
 
+def create_patch_zip(full_zip_path: Path) -> Path:
+    patch_name = f"VoterMail_Engine_v{__version__}_Patch.zip"
+    patch_path = DIST_DIR / patch_name
+    print(f"[*] Mengompresi paket patch ringan ke arsip: {patch_path.name}...")
+
+    patch_files: list[Path] = []
+
+    exe_file = PACKAGE_DIR / "VoterMail_Engine.exe"
+    if exe_file.exists():
+        patch_files.append(exe_file)
+
+    assets_folder = PACKAGE_DIR / "app" / "assets"
+    if assets_folder.exists():
+        for root, _, files in os.walk(assets_folder):
+            for f in files:
+                patch_files.append(Path(root) / f)
+
+    guide_file = PACKAGE_DIR / "PANDUAN_PANITIA.txt"
+    if guide_file.exists():
+        patch_files.append(guide_file)
+
+    internal_dir = PACKAGE_DIR / "_internal"
+    if internal_dir.exists():
+        for root, _, files in os.walk(internal_dir):
+            for f in files:
+                fp = Path(root) / f
+                rel_parts = fp.relative_to(internal_dir).parts
+                if f == "base_library.zip" or "app" in rel_parts:
+                    patch_files.append(fp)
+
+    with zipfile.ZipFile(patch_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for file_full in patch_files:
+            rel_path = file_full.relative_to(DIST_DIR)
+            zf.write(file_full, arcname=str(rel_path))
+
+    if not patch_path.exists() or patch_path.stat().st_size == 0:
+        raise RuntimeError(f"Gagal membuat file ZIP patch: {patch_path} tidak ditemukan atau 0 byte.")
+
+    size_mb = patch_path.stat().st_size / (1024 * 1024)
+    print(f"[✓] Paket patch berhasil dirakit: {patch_path.name} ({size_mb:.2f} MB)")
+    return patch_path
+
+def create_update_manifest(full_zip: Path, patch_zip: Path) -> Path:
+    manifest_path = DIST_DIR / "update_manifest.json"
+    deps_hash = compute_deps_hash(BASE_DIR / "requirements.txt")
+    full_sha = compute_file_sha256(full_zip)
+    patch_sha = compute_file_sha256(patch_zip)
+
+    manifest_data = {
+        "version": __version__,
+        "deps_hash": deps_hash,
+        "patch": {
+            "filename": patch_zip.name,
+            "size_bytes": patch_zip.stat().st_size,
+            "sha256": patch_sha,
+        },
+        "full": {
+            "filename": full_zip.name,
+            "size_bytes": full_zip.stat().st_size,
+            "sha256": full_sha,
+        },
+    }
+
+    manifest_path.write_text(json.dumps(manifest_data, indent=2), encoding="utf-8")
+    print(f"[✓] Manifest pembaruan berhasil dibuat: {manifest_path.name}")
+    return manifest_path
+
 def main() -> None:
     print(f"\n========================================================")
     print(f" VoterMail Engine v{__version__} — Portable EXE Packaging Tool")
@@ -205,8 +288,13 @@ def main() -> None:
     clean_build_artifacts()
     run_pyinstaller()
     prepare_distribution_tree()
-    zip_path = create_portable_zip()
-    print(f"\n[SELESAI] Paket siap didistribusikan di: {zip_path}\n")
+    full_zip = create_portable_zip()
+    patch_zip = create_patch_zip(full_zip)
+    manifest_file = create_update_manifest(full_zip, patch_zip)
+    print(f"\n[SELESAI] Seluruh 3 artefak rilis siap didistribusikan:")
+    print(f"  1. Paket Penuh: {full_zip.name} ({full_zip.stat().st_size / (1024*1024):.2f} MB)")
+    print(f"  2. Paket Patch: {patch_zip.name} ({patch_zip.stat().st_size / (1024*1024):.2f} MB)")
+    print(f"  3. Manifest:    {manifest_file.name}\n")
 
 if __name__ == "__main__":
     main()

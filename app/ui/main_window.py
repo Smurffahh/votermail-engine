@@ -257,6 +257,57 @@ class MainWindow(ctk.CTk):
 
         self.destroy()
 
+    def _prepare_shutdown_for_update(self) -> bool:
+        if self.is_processing:
+            confirmed = [False]
+
+            def do_abort() -> None:
+                confirmed[0] = True
+
+            modal = ModernNotificationModal(
+                parent=self,
+                variant="confirm",
+                title="Hentikan Proses untuk Memperbarui?",
+                summary="Proses pembuatan surat pemilih sedang berlangsung di latar belakang. Pembaruan aplikasi memerlukan penghentian proses cetak.",
+                solution="Klik 'Hentikan & Lanjutkan Update' untuk membatalkan proses cetak saat ini dan melanjutkan instalasi pembaruan.",
+                primary_action_label="Hentikan & Lanjutkan Update",
+                primary_action_callback=do_abort,
+                secondary_action_label="Tunda Update",
+                theme=self.theme,
+            )
+            self.wait_window(modal)
+            if not confirmed[0]:
+                return False
+            self.cancel_event.set()
+
+        try:
+            self._save_active_config()
+        except Exception:
+            pass
+
+        try:
+            clean_temp_dir()
+        except Exception:
+            pass
+
+        return True
+
+    def _shutdown_and_exit_for_update(self) -> None:
+        try:
+            self._save_active_config()
+        except Exception:
+            pass
+        try:
+            clean_temp_dir()
+        except Exception:
+            pass
+        try:
+            self.withdraw()
+            self.destroy()
+        except Exception:
+            pass
+        os._exit(0)
+
     def _build_ui(self) -> None:
         self.header_frame = ctk.CTkFrame(
             self,

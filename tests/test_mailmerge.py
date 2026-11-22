@@ -1584,8 +1584,8 @@ class TestMailMergeApp(unittest.TestCase):
         import app.ui.components as comp
         import app.ui.modals as modals
 
-        self.assertEqual(__version__, "1.11.2")
-        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.11.2")
+        self.assertEqual(__version__, "1.12.0")
+        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.12.0")
         self.assertEqual(__author__, "Danang Satria")
 
         # Verify modals and helpers exist in modals.py and re-exported in components.py
@@ -1661,56 +1661,61 @@ class TestMailMergeApp(unittest.TestCase):
             validate_version_registry(FEATURE_REGISTRY, current_version="9.9.9")
         self.assertIn("tidak cocok", str(ctx_mismatch.exception))
 
-        # 6. Auto-Updater compatibility: Old versions (1.9.4, 1.10.0, 1.10.4, 1.11.0, 1.11.1) detect 1.11.2
-        mock_payload_1_11_2 = {
-            "tag_name": "v1.11.2",
-            "name": "VoterMail Engine v1.11.2",
-            "body": "Rilis Resmi v1.11.2",
+        # 6. Auto-Updater compatibility: Old versions (1.9.4, 1.10.0, 1.10.4, 1.11.0, 1.11.1, 1.11.2) detect 1.12.0
+        mock_payload_1_12_0 = {
+            "tag_name": "v1.12.0",
+            "name": "VoterMail Engine v1.12.0",
+            "body": "Rilis Resmi v1.12.0",
             "assets": [
                 {
-                    "name": "VoterMail_Engine_v1.11.2_Windows_x64_Portable.zip",
-                    "browser_download_url": "https://github.com/Smurffahh/votermail-engine/releases/download/v1.11.2/VoterMail_Engine_v1.11.2_Windows_x64_Portable.zip",
+                    "name": "VoterMail_Engine_v1.12.0_Windows_x64_Portable.zip",
+                    "browser_download_url": "https://github.com/Smurffahh/votermail-engine/releases/download/v1.12.0/VoterMail_Engine_v1.12.0_Windows_x64_Portable.zip",
                 }
             ],
-            "html_url": "https://github.com/Smurffahh/votermail-engine/releases/tag/v1.11.2",
+            "html_url": "https://github.com/Smurffahh/votermail-engine/releases/tag/v1.12.0",
         }
         mock_resp = MagicMock()
         mock_resp.status = 200
-        mock_resp.read.return_value = json.dumps(mock_payload_1_11_2).encode("utf-8")
+        mock_resp.read.return_value = json.dumps(mock_payload_1_12_0).encode("utf-8")
         mock_resp.__enter__.return_value = mock_resp
 
         with patch("urllib.request.urlopen", return_value=mock_resp):
             # User from v1.9.4
             res_194 = check_for_updates(current_version="1.9.4")
             self.assertTrue(res_194["update_available"])
-            self.assertEqual(res_194["latest_version"], "1.11.2")
+            self.assertEqual(res_194["latest_version"], "1.12.0")
 
             # User from v1.10.0
             res_1100 = check_for_updates(current_version="1.10.0")
             self.assertTrue(res_1100["update_available"])
-            self.assertEqual(res_1100["latest_version"], "1.11.2")
+            self.assertEqual(res_1100["latest_version"], "1.12.0")
 
             # User from v1.10.4
             res_1104 = check_for_updates(current_version="1.10.4")
             self.assertTrue(res_1104["update_available"])
-            self.assertEqual(res_1104["latest_version"], "1.11.2")
+            self.assertEqual(res_1104["latest_version"], "1.12.0")
 
             # User from v1.11.0
             res_1110 = check_for_updates(current_version="1.11.0")
             self.assertTrue(res_1110["update_available"])
-            self.assertEqual(res_1110["latest_version"], "1.11.2")
+            self.assertEqual(res_1110["latest_version"], "1.12.0")
 
             # User from v1.11.1
             res_1111 = check_for_updates(current_version="1.11.1")
             self.assertTrue(res_1111["update_available"])
-            self.assertEqual(res_1111["latest_version"], "1.11.2")
+            self.assertEqual(res_1111["latest_version"], "1.12.0")
 
-            # User already on v1.11.2
+            # User from v1.11.2
             res_1112 = check_for_updates(current_version="1.11.2")
-            self.assertFalse(res_1112["update_available"])
+            self.assertTrue(res_1112["update_available"])
+            self.assertEqual(res_1112["latest_version"], "1.12.0")
 
-            # User on future build v1.12.0
-            res_future = check_for_updates(current_version="1.12.0")
+            # User already on v1.12.0
+            res_1120 = check_for_updates(current_version="1.12.0")
+            self.assertFalse(res_1120["update_available"])
+
+            # User on future build v1.13.0
+            res_future = check_for_updates(current_version="1.13.0")
             self.assertFalse(res_future["update_available"])
 
     def test_40_ooxml_shape_sanitization_and_no_ghost_text(self) -> None:
@@ -1869,6 +1874,176 @@ class TestMailMergeApp(unittest.TestCase):
             self.assertIn("1.129", table.lbl_status_summary.cget("text"))
         finally:
             root.destroy()
+
+    def test_42_smart_in_place_patch_updater_and_integrity_verification(self) -> None:
+        import hashlib
+        import json
+        import subprocess
+        import tempfile
+        import zipfile
+        from unittest.mock import patch, MagicMock
+        from app.core.updater import (
+            compute_deps_hash,
+            compute_file_sha256,
+            format_file_size,
+            check_for_updates,
+            stage_update_package,
+            generate_patch_script,
+            launch_detached_patcher,
+        )
+        from app.ui.main_window import MainWindow
+
+        # 1. Dependency Hash computation invariance
+        req_1 = "customtkinter==5.2.2\npython-docx==1.1.2\n# Comment\n\npypdf==5.1.0\n"
+        req_2 = "# Header comment\npypdf==5.1.0\n\npython-docx==1.1.2\ncustomtkinter==5.2.2\n"
+        req_3 = "customtkinter==5.2.2\npython-docx==1.2.0\npypdf==5.1.0\n"
+        h1 = compute_deps_hash(req_1)
+        h2 = compute_deps_hash(req_2)
+        h3 = compute_deps_hash(req_3)
+        self.assertEqual(h1, h2)
+        self.assertNotEqual(h1, h3)
+
+        # 2. File size formatting with Indonesian comma
+        self.assertEqual(format_file_size(4_390_000), "4,2 MB")
+        self.assertEqual(format_file_size(33_000_000), "31,5 MB")
+        self.assertEqual(format_file_size(850_000), "830 KB")
+        self.assertEqual(format_file_size(500), "500 B")
+
+        # 3. Check for updates: Patch vs Full resolution via update_manifest.json
+        manifest_data = {
+            "version": "1.12.0",
+            "deps_hash": h1,
+            "assets": {
+                "full_zip": {
+                    "name": "VoterMail_Engine_v1.12.0_Windows_x64_Portable.zip",
+                    "size": 33_000_000,
+                    "sha256": "aaaa1111",
+                },
+                "patch_zip": {
+                    "name": "VoterMail_Engine_v1.12.0_Windows_x64_Patch.zip",
+                    "size": 4_390_000,
+                    "sha256": "bbbb2222",
+                },
+            },
+        }
+
+        mock_release = {
+            "tag_name": "v1.12.0",
+            "name": "VoterMail Engine v1.12.0",
+            "body": "Notes v1.12.0",
+            "assets": [
+                {
+                    "name": "update_manifest.json",
+                    "browser_download_url": "https://github.com/Smurffahh/votermail-engine/releases/download/v1.12.0/update_manifest.json",
+                },
+                {
+                    "name": "VoterMail_Engine_v1.12.0_Windows_x64_Portable.zip",
+                    "browser_download_url": "https://github.com/Smurffahh/votermail-engine/releases/download/v1.12.0/VoterMail_Engine_v1.12.0_Windows_x64_Portable.zip",
+                    "size": 33_000_000,
+                },
+                {
+                    "name": "VoterMail_Engine_v1.12.0_Windows_x64_Patch.zip",
+                    "browser_download_url": "https://github.com/Smurffahh/votermail-engine/releases/download/v1.12.0/VoterMail_Engine_v1.12.0_Windows_x64_Patch.zip",
+                    "size": 4_390_000,
+                },
+            ],
+            "html_url": "https://github.com/Smurffahh/votermail-engine/releases/tag/v1.12.0",
+        }
+
+        def mock_urlopen_router(req, *args, **kwargs):
+            url = req.full_url if hasattr(req, "full_url") else str(req)
+            resp = MagicMock()
+            resp.status = 200
+            if "update_manifest.json" in url:
+                resp.read.return_value = json.dumps(manifest_data).encode("utf-8")
+            else:
+                resp.read.return_value = json.dumps(mock_release).encode("utf-8")
+            resp.__enter__.return_value = resp
+            return resp
+
+        # Case A: Dependencies match -> Resolves PATCH mode
+        with patch("urllib.request.urlopen", side_effect=mock_urlopen_router), \
+             patch("app.core.updater.get_local_build_meta", return_value={"deps_hash": h1}):
+            info_patch = check_for_updates(current_version="1.11.2")
+            self.assertTrue(info_patch["update_available"])
+            self.assertEqual(info_patch["update_mode"], "PATCH")
+            self.assertIn("Patch.zip", info_patch["download_url"])
+            self.assertEqual(info_patch["expected_sha256"], "bbbb2222")
+            self.assertEqual(info_patch["download_size_bytes"], 4_390_000)
+
+        # Case B: Dependencies changed -> Resolves FULL mode
+        with patch("urllib.request.urlopen", side_effect=mock_urlopen_router), \
+             patch("app.core.updater.get_local_build_meta", return_value={"deps_hash": "different_hash"}):
+            info_full = check_for_updates(current_version="1.11.2")
+            self.assertTrue(info_full["update_available"])
+            self.assertEqual(info_full["update_mode"], "FULL")
+            self.assertIn("Portable.zip", info_full["download_url"])
+            self.assertEqual(info_full["expected_sha256"], "aaaa1111")
+            self.assertEqual(info_full["download_size_bytes"], 33_000_000)
+
+        # 4. stage_update_package SHA-256 verification and anti-Zip-Slip
+        with tempfile.TemporaryDirectory() as td:
+            pkg_zip_path = Path(td) / "test_pkg.zip"
+            with zipfile.ZipFile(pkg_zip_path, "w") as z:
+                z.writestr("VoterMail_Engine.exe", b"MZ_MOCK_EXE")
+                z.writestr("app/assets/build_meta.json", b'{"version": "1.12.0"}')
+
+            pkg_bytes = pkg_zip_path.read_bytes()
+            real_sha = hashlib.sha256(pkg_bytes).hexdigest()
+
+            def mock_dl_resp(req, *args, **kwargs):
+                resp = MagicMock()
+                resp.status = 200
+                resp.headers = {"Content-Length": str(len(pkg_bytes))}
+                resp.read.side_effect = [pkg_bytes, b""]
+                resp.__enter__.return_value = resp
+                return resp
+
+            # Subcase: Corrupted bytes -> Fails integrity
+            with patch("urllib.request.urlopen", side_effect=mock_dl_resp):
+                ok_corrupt, msg_corrupt, _, _ = stage_update_package(
+                    download_url="https://github.com/Smurffahh/votermail-engine/releases/download/v1.12.0/test_pkg.zip",
+                    target_version="1.12.0_test_bad",
+                    expected_sha256="wrong_checksum_000000000000000000000000000000000000000000000000000000",
+                    update_mode="PATCH",
+                )
+                self.assertFalse(ok_corrupt)
+                self.assertIn("integritas", msg_corrupt.lower())
+                self.assertIn("SHA-256", msg_corrupt)
+
+            # Subcase: Valid SHA-256 -> Success
+            with patch("urllib.request.urlopen", side_effect=mock_dl_resp):
+                ok_valid, msg_valid, s_dir, src_dir = stage_update_package(
+                    download_url="https://github.com/Smurffahh/votermail-engine/releases/download/v1.12.0/test_pkg.zip",
+                    target_version="1.12.0_test_good",
+                    expected_sha256=real_sha,
+                    update_mode="PATCH",
+                )
+                self.assertTrue(ok_valid, f"Staging failed: {msg_valid}")
+                self.assertIsNotNone(s_dir)
+                self.assertTrue((src_dir / "VoterMail_Engine.exe").exists())
+
+        # 5. PowerShell script generation: pure ASCII, CRLF, and AST parse validity
+        with tempfile.TemporaryDirectory() as td:
+            ps1_path = generate_patch_script(td)
+            self.assertTrue(ps1_path.exists())
+            raw_bytes = ps1_path.read_bytes()
+            self.assertTrue(all(b < 128 for b in raw_bytes))
+            self.assertIn(b"\r\n", raw_bytes)
+            self.assertNotIn(b"\n", raw_bytes.replace(b"\r\n", b""))
+
+            ps_cmd = [
+                "powershell.exe",
+                "-NoProfile",
+                "-Command",
+                f"$errs = $null; [System.Management.Automation.Language.Parser]::ParseFile('{str(ps1_path)}', [ref]$null, [ref]$errs); if ($errs.Count -gt 0) {{ $errs | ForEach-Object {{ Write-Error $_.Message }}; exit 1 }} else {{ exit 0 }}",
+            ]
+            res_ps = subprocess.run(ps_cmd, capture_output=True, text=True)
+            self.assertEqual(res_ps.returncode, 0, f"PowerShell syntax error: {res_ps.stderr}")
+
+        # 6. Verify MainWindow shutdown methods exist
+        self.assertTrue(hasattr(MainWindow, "_prepare_shutdown_for_update"))
+        self.assertTrue(hasattr(MainWindow, "_shutdown_and_exit_for_update"))
 
 if __name__ == "__main__":
     unittest.main()

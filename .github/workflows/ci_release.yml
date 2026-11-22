@@ -91,12 +91,20 @@ jobs:
 
           zip_name = f"VoterMail_Engine_v{__version__}_Windows_x64_Portable.zip"
           zip_path = f"dist/{zip_name}"
+          patch_name = f"VoterMail_Engine_v{__version__}_Patch.zip"
+          patch_path = f"dist/{patch_name}"
+          manifest_name = "update_manifest.json"
+          manifest_path = "dist/update_manifest.json"
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
               f.write(f"version={__version__}\n")
               f.write(f"tag=v{__version__}\n")
               f.write(f"zip_name={zip_name}\n")
               f.write(f"zip_path={zip_path}\n")
+              f.write(f"patch_name={patch_name}\n")
+              f.write(f"patch_path={patch_path}\n")
+              f.write(f"manifest_name={manifest_name}\n")
+              f.write(f"manifest_path={manifest_path}\n")
 
           latest_entry = FEATURE_REGISTRY[-1]
           ver = latest_entry.get("version", __version__)
@@ -130,11 +138,14 @@ jobs:
         run: |
           python scripts/build_exe.py
 
-      - name: Upload Build Artifact to Workflow Summary
+      - name: Upload Build Artifacts to Workflow Summary
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.meta.outputs.zip_name }}
-          path: ${{ steps.meta.outputs.zip_path }}
+          name: VoterMail_Engine_Release_Assets
+          path: |
+            ${{ steps.meta.outputs.zip_path }}
+            ${{ steps.meta.outputs.patch_path }}
+            ${{ steps.meta.outputs.manifest_path }}
           retention-days: 30
 
       - name: Publish Portable EXE to GitHub Releases
@@ -143,7 +154,10 @@ jobs:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: "VoterMail Engine ${{ steps.meta.outputs.tag }} (Windows x64 Portable .EXE)"
           body_path: RELEASE_NOTES.md
-          files: ${{ steps.meta.outputs.zip_path }}
+          files: |
+            ${{ steps.meta.outputs.zip_path }}
+            ${{ steps.meta.outputs.patch_path }}
+            ${{ steps.meta.outputs.manifest_path }}
           draft: false
           prerelease: false
         env:
