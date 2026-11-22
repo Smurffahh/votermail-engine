@@ -1584,8 +1584,8 @@ class TestMailMergeApp(unittest.TestCase):
         import app.ui.components as comp
         import app.ui.modals as modals
 
-        self.assertEqual(__version__, "1.11.0")
-        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.11.0")
+        self.assertEqual(__version__, "1.11.1")
+        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.11.1")
         self.assertEqual(__author__, "Danang Satria")
 
         # Verify modals and helpers exist in modals.py and re-exported in components.py
@@ -1661,47 +1661,161 @@ class TestMailMergeApp(unittest.TestCase):
             validate_version_registry(FEATURE_REGISTRY, current_version="9.9.9")
         self.assertIn("tidak cocok", str(ctx_mismatch.exception))
 
-        # 6. Auto-Updater compatibility: Old versions (1.9.4, 1.10.0, 1.10.4) detect 1.11.0
-        mock_payload_1_11 = {
-            "tag_name": "v1.11.0",
-            "name": "VoterMail Engine v1.11.0",
-            "body": "Rilis Resmi v1.11.0",
+        # 6. Auto-Updater compatibility: Old versions (1.9.4, 1.10.0, 1.10.4, 1.11.0) detect 1.11.1
+        mock_payload_1_11_1 = {
+            "tag_name": "v1.11.1",
+            "name": "VoterMail Engine v1.11.1",
+            "body": "Rilis Resmi v1.11.1",
             "assets": [
                 {
-                    "name": "VoterMail_Engine_v1.11.0_Windows_x64_Portable.zip",
-                    "browser_download_url": "https://github.com/Smurffahh/votermail-engine/releases/download/v1.11.0/VoterMail_Engine_v1.11.0_Windows_x64_Portable.zip",
+                    "name": "VoterMail_Engine_v1.11.1_Windows_x64_Portable.zip",
+                    "browser_download_url": "https://github.com/Smurffahh/votermail-engine/releases/download/v1.11.1/VoterMail_Engine_v1.11.1_Windows_x64_Portable.zip",
                 }
             ],
-            "html_url": "https://github.com/Smurffahh/votermail-engine/releases/tag/v1.11.0",
+            "html_url": "https://github.com/Smurffahh/votermail-engine/releases/tag/v1.11.1",
         }
         mock_resp = MagicMock()
         mock_resp.status = 200
-        mock_resp.read.return_value = json.dumps(mock_payload_1_11).encode("utf-8")
+        mock_resp.read.return_value = json.dumps(mock_payload_1_11_1).encode("utf-8")
         mock_resp.__enter__.return_value = mock_resp
 
         with patch("urllib.request.urlopen", return_value=mock_resp):
             # User from v1.9.4
             res_194 = check_for_updates(current_version="1.9.4")
             self.assertTrue(res_194["update_available"])
-            self.assertEqual(res_194["latest_version"], "1.11.0")
+            self.assertEqual(res_194["latest_version"], "1.11.1")
 
             # User from v1.10.0
             res_1100 = check_for_updates(current_version="1.10.0")
             self.assertTrue(res_1100["update_available"])
-            self.assertEqual(res_1100["latest_version"], "1.11.0")
+            self.assertEqual(res_1100["latest_version"], "1.11.1")
 
             # User from v1.10.4
             res_1104 = check_for_updates(current_version="1.10.4")
             self.assertTrue(res_1104["update_available"])
-            self.assertEqual(res_1104["latest_version"], "1.11.0")
+            self.assertEqual(res_1104["latest_version"], "1.11.1")
 
-            # User already on v1.11.0
+            # User from v1.11.0
             res_1110 = check_for_updates(current_version="1.11.0")
-            self.assertFalse(res_1110["update_available"])
+            self.assertTrue(res_1110["update_available"])
+            self.assertEqual(res_1110["latest_version"], "1.11.1")
+
+            # User already on v1.11.1
+            res_1111 = check_for_updates(current_version="1.11.1")
+            self.assertFalse(res_1111["update_available"])
 
             # User on future build v1.12.0
             res_future = check_for_updates(current_version="1.12.0")
             self.assertFalse(res_future["update_available"])
+
+    def test_40_ooxml_shape_sanitization_and_no_ghost_text(self) -> None:
+        import zipfile
+        import tempfile
+        from lxml import etree
+        from app.core.mail_merger import sanitize_merged_ooxml_shapes, generate_preview_via_word
+        from app.core.word_preparer import check_and_prepare_word_template
+        from app.config.settings import get_default_word_path, OUTPUT_DIR
+
+        # 1. Test OOXML sanitization helper with duplicate shapes, AlternateContent, and empty ghost shapes
+        test_xml = (
+            b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+            b'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+            b'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" '
+            b'xmlns:v="urn:schemas-microsoft-com:vml" '
+            b'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" '
+            b'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">\n'
+            b'<w:body>\n'
+            b'  <w:p><w:r><w:pict>'
+            b'    <v:shape id="_x0000_s1026" type="#_x0000_t202" filled="f" stroked="f">'
+            b'      <v:textbox><w:txbxContent><w:p><w:r><w:t></w:t></w:r></w:p></w:txbxContent></v:textbox>'
+            b'    </v:shape>'
+            b'  </w:pict></w:r></w:p>\n'
+            b'  <w:p><w:r><w:pict>'
+            b'    <v:shape id="_x0000_s1026" type="#_x0000_t6" filled="t" stroked="f">'
+            b'      <v:textpath string="PANITIA PEMILIHAN"/>'
+            b'    </v:shape>'
+            b'  </w:pict></w:r></w:p>\n'
+            b'  <w:p><w:r><w:pict>'
+            b'    <v:shape id="_x0000_s1026" type="#_x0000_t6" filled="t" stroked="f">'
+            b'      <v:textpath string="PANITIA PEMILIHAN"/>'
+            b'    </v:shape>'
+            b'  </w:pict></w:r></w:p>\n'
+            b'  <w:p><w:r><w:drawing><wp:docPr id="1" name="Shape 1"/></w:drawing></w:r></w:p>\n'
+            b'  <w:p><w:r><w:drawing><wp:docPr id="1" name="Shape 1"/></w:drawing></w:r></w:p>\n'
+            b'  <w:p><w:r><mc:AlternateContent>'
+            b'    <mc:Choice Requires="w14"><w:drawing><wps:cNvPr id="2"/><w:t>PANITIA PEMILIHAN</w:t></w:drawing></mc:Choice>'
+            b'    <mc:Fallback><w:pict><w:t>PANITIA PEMILIHAN</w:t></w:pict></mc:Fallback>'
+            b'  </mc:AlternateContent></w:r></w:p>\n'
+            b'</w:body></w:document>'
+        )
+
+        with tempfile.TemporaryDirectory() as td:
+            dummy_docx = Path(td) / "test_ooxml.docx"
+            with zipfile.ZipFile(dummy_docx, "w") as z:
+                z.writestr("word/document.xml", test_xml)
+
+            sanitize_merged_ooxml_shapes(str(dummy_docx))
+
+            with zipfile.ZipFile(dummy_docx, "r") as z:
+                res_xml = z.read("word/document.xml")
+                root = etree.fromstring(res_xml)
+                ns = {
+                    "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                    "mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+                    "v": "urn:schemas-microsoft-com:vml",
+                    "wp": "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+                }
+                # Check root mc:Ignorable contains w14 and wp14
+                ign_val = root.attrib.get("{http://schemas.openxmlformats.org/markup-compatibility/2006}Ignorable", "")
+                self.assertIn("w14", ign_val)
+                self.assertIn("wp14", ign_val)
+
+                # Check empty ghost shape was removed
+                shapes = root.xpath("//v:shape", namespaces=ns)
+                self.assertEqual(len(shapes), 2)
+                shape_ids = [s.attrib.get("id") for s in shapes]
+                self.assertEqual(len(shape_ids), len(set(shape_ids)))
+
+                # Check docPr IDs are unique
+                docprs = root.xpath("//wp:docPr", namespaces=ns)
+                self.assertEqual(len(docprs), 2)
+                docpr_ids = [d.attrib.get("id") for d in docprs]
+                self.assertEqual(len(docpr_ids), len(set(docpr_ids)))
+
+                # Check fallback duplicate text was neutralized
+                fallback_t = root.xpath("//mc:AlternateContent/mc:Fallback//w:t", namespaces=ns)
+                for t in fallback_t:
+                    self.assertEqual(t.text or "", "")
+
+        # 2. Check that template preparation does not inject synthetic horizontal textboxes
+        def_word = get_default_word_path()
+        if os.path.exists(def_word) and is_ms_word_installed():
+            word_res = check_and_prepare_word_template(str(def_word))
+            self.assertTrue(word_res.is_valid)
+            with zipfile.ZipFile(word_res.prepared_docx_path, "r") as z:
+                xml_content = z.read("word/document.xml").decode("utf-8")
+                # There should be exactly 4 occurrences of "PANITIA PEMILIHAN" in v:textpath
+                self.assertEqual(xml_content.count("PANITIA PEMILIHAN"), 4)
+
+            # 3. Verify PDF preview has no duplicate horizontal ghost text
+            preview_pdf = str(OUTPUT_DIR / "test_no_ghost_preview.pdf")
+            ok, msg, final_pdf = generate_preview_via_word(
+                template_docx_path=word_res.prepared_docx_path,
+                sample_voters=[],
+                output_pdf_path=preview_pdf,
+            )
+            self.assertTrue(ok, f"Preview failed: {msg}")
+            if os.path.exists(final_pdf):
+                try:
+                    import pypdf
+                    reader = pypdf.PdfReader(final_pdf)
+                    text = reader.pages[0].extract_text()
+                    self.assertEqual(text.count("Panitia Pemilihan Kepala Desa Karangjengkol"), 2)
+                finally:
+                    try:
+                        os.unlink(final_pdf)
+                    except Exception:
+                        pass
 
 if __name__ == "__main__":
     unittest.main()

@@ -179,6 +179,18 @@ FEATURE_REGISTRY: list[dict[str, Any]] = [
             "Konsolidasi seluruh pembaruan keamanan, notifikasi modern, tipografi Inter & Space Mono, modularisasi UI, serta perbaikan launcher Windows dalam satu rilis stabil.",
         ],
     },
+    {
+        "version": "1.11.1",
+        "date": "2026-11-22",
+        "title": "Perbaikan Duplikasi Teks Horizontal 'PANITIA PEMILIHAN' & Sanitasi OOXML",
+        "description": "Mengeliminasi teks duplikat horizontal 'PANITIA PEMILIHAN' pada pratinjau dan hasil cetak PDF melalui eliminasi textbox sintetis Word COM serta sanitasi berkas OOXML terpadu (penomoran ulang ID grafis DrawingML/VML dan normalisasi markup AlternateContent).",
+        "highlights": [
+            "Eliminasi textbox horizontal sintetis pada proses konversi template .doc ke .docx.",
+            "Sanitasi penomoran unik ID grafis (wp:docPr, wps:cNvPr, v:shape) lintas halaman hasil merge docxcompose.",
+            "Normalisasi AlternateContent dan preservasi namespace mc:Ignorable (w14 wp14) untuk isolasi Word COM PDF.",
+            "Pembersihan otomatis elemen shape hantu tanpa isi/fill/stroke pada pipeline template.",
+        ],
+    },
 ]
 
 def get_latest_release_entry() -> dict[str, Any]:

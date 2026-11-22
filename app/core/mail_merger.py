@@ -11,9 +11,11 @@ import tempfile
 import threading
 import time
 from typing import Callable
+import zipfile
 import docx
 from docxcompose.composer import Composer
 from docxtpl import DocxTemplate
+from lxml import etree
 from pypdf import PdfReader, PdfWriter
 import pythoncom
 import win32com.client
@@ -47,6 +49,100 @@ def apply_pdf_metadata(pdf_path: str, kadus_name: str = "") -> None:
     except Exception:
         pass
 
+def sanitize_merged_ooxml_shapes(docx_path: str) -> None:
+    abs_path = to_win_abs_path(docx_path)
+    if not os.path.exists(abs_path):
+        return
+
+    tmp_path = f"{abs_path}.sanitized.tmp"
+    try:
+        with zipfile.ZipFile(abs_path, "r") as zin:
+            if "word/document.xml" not in zin.namelist():
+                return
+            with zipfile.ZipFile(tmp_path, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+                for item in zin.infolist():
+                    data = zin.read(item.filename)
+                    if item.filename == "word/document.xml":
+                        root = etree.fromstring(data)
+                        ns = {k: v for k, v in root.nsmap.items() if k is not None}
+                        default_ns = {
+                            "mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+                            "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+                            "w14": "http://schemas.microsoft.com/office/word/2010/wordml",
+                            "wp14": "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing",
+                            "wp": "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+                            "v": "urn:schemas-microsoft-com:vml",
+                            "wps": "http://schemas.microsoft.com/office/word/2010/wordprocessingShape",
+                            "pic": "http://schemas.openxmlformats.org/drawingml/2006/picture",
+                            "wpg": "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup",
+                            "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+                        }
+                        ns.update({k: v for k, v in default_ns.items() if k not in ns})
+
+                        mc_ns = default_ns["mc"]
+                        ign_qname = f"{{{mc_ns}}}Ignorable"
+                        cur_ign = root.attrib.get(ign_qname, "")
+                        tokens = set(cur_ign.split())
+                        tokens.update(["w14", "wp14"])
+                        root.attrib[ign_qname] = " ".join(sorted(tokens))
+
+                        alt_contents = root.xpath("//mc:AlternateContent", namespaces=ns)
+                        for ac in alt_contents:
+                            choices = ac.xpath("./mc:Choice", namespaces=ns)
+                            fallbacks = ac.xpath("./mc:Fallback", namespaces=ns)
+                            if choices and fallbacks:
+                                choice_texts = [
+                                    t.text.strip()
+                                    for t in choices[0].xpath(".//w:t", namespaces=ns)
+                                    if t.text and t.text.strip()
+                                ]
+                                choice_textpaths = [
+                                    tp.strip()
+                                    for tp in choices[0].xpath(".//v:textpath/@string", namespaces=ns)
+                                    if tp and tp.strip()
+                                ]
+                                combined_choice = set(choice_texts) | set(choice_textpaths)
+                                if combined_choice:
+                                    for t in fallbacks[0].xpath(".//w:t", namespaces=ns):
+                                        if t.text and t.text.strip() in combined_choice:
+                                            t.text = ""
+
+                        empty_shapes = []
+                        for s in root.xpath("//v:shape", namespaces=ns):
+                            has_fill = s.attrib.get("filled", "t").lower() not in ("f", "false", "0")
+                            has_stroke = s.attrib.get("stroked", "t").lower() not in ("f", "false", "0")
+                            text_runs = s.xpath(".//w:t[normalize-space(text()) != '']", namespaces=ns)
+                            textpaths = s.xpath(".//v:textpath", namespaces=ns)
+                            if not has_fill and not has_stroke and not text_runs and not textpaths:
+                                empty_shapes.append(s)
+                        for s in empty_shapes:
+                            parent = s.getparent()
+                            if parent is not None:
+                                parent.remove(s)
+
+                        vml_shapes = root.xpath("//v:shape | //v:group | //v:rect | //v:oval | //v:line", namespaces=ns)
+                        for i, s in enumerate(vml_shapes, start=1025):
+                            s.set("id", f"_x0000_s{i}")
+
+                        docprs = root.xpath("//wp:docPr", namespaces=ns)
+                        for i, d in enumerate(docprs, start=1):
+                            d.set("id", str(i))
+
+                        cnvprs = root.xpath("//wps:cNvPr | //pic:cNvPr | //wpg:cNvPr", namespaces=ns)
+                        for i, c in enumerate(cnvprs, start=1001):
+                            c.set("id", str(i))
+
+                        data = etree.tostring(root, xml_declaration=True, encoding="utf-8", standalone="yes")
+                    zout.writestr(item, data)
+
+        shutil.move(tmp_path, abs_path)
+    except Exception:
+        if os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
 def export_docx_to_pdf_via_word(docx_path: str, pdf_path: str) -> tuple[bool, str, str]:
     abs_docx = to_win_abs_path(docx_path)
     abs_pdf = to_win_abs_path(pdf_path)
@@ -55,6 +151,7 @@ def export_docx_to_pdf_via_word(docx_path: str, pdf_path: str) -> tuple[bool, st
         return False, f"File docx tidak ditemukan: {abs_docx}", abs_pdf
 
     Path(abs_pdf).parent.mkdir(parents=True, exist_ok=True)
+    sanitize_merged_ooxml_shapes(abs_docx)
 
     accessible, lock_err = check_file_accessible_for_writing(abs_pdf)
     if not accessible:
@@ -261,6 +358,7 @@ def merge_voters_to_pdf_via_word_com(
 
         merged_docx_path = os.path.join(temp_dir, "merged_kadus.docx")
         composer.save(merged_docx_path)
+        sanitize_merged_ooxml_shapes(merged_docx_path)
 
         if cancel_event is not None and cancel_event.is_set():
             return False, 0, "Proses mailing dibatalkan pengguna."

@@ -192,25 +192,6 @@ def _convert_doc_to_docx_via_word_com(source_path: str, target_docx_path: str) -
         except Exception:
             pass
 
-        try:
-            tb1 = doc.Shapes.AddTextbox(1, 480, 15, 120, 20)
-            tb1.TextFrame.TextRange.Text = "PANITIA PEMILIHAN"
-            tb1.TextFrame.TextRange.Font.Name = "Arial"
-            tb1.TextFrame.TextRange.Font.Size = 8
-            tb1.TextFrame.TextRange.Font.Bold = True
-            tb1.Fill.Visible = False
-            tb1.Line.Visible = False
-
-            tb2 = doc.Shapes.AddTextbox(1, 480, 475, 120, 20)
-            tb2.TextFrame.TextRange.Text = "PANITIA PEMILIHAN"
-            tb2.TextFrame.TextRange.Font.Name = "Arial"
-            tb2.TextFrame.TextRange.Font.Size = 8
-            tb2.TextFrame.TextRange.Font.Bold = True
-            tb2.Fill.Visible = False
-            tb2.Line.Visible = False
-        except Exception:
-            pass
-
         save_err = None
         for attempt in range(3):
             try:
