@@ -78,6 +78,15 @@ def get_default_excel_path() -> str:
         return str(sample_excel.resolve())
     return ""
 
+def format_int_id(value: int | float | str | None) -> str:
+    if value is None:
+        return "0"
+    try:
+        val = int(value)
+        return f"{val:,}".replace(",", ".")
+    except (ValueError, TypeError):
+        return str(value)
+
 class AppConfig(BaseModel):
     word_path: str = Field(default_factory=get_default_word_path)
     excel_path: str = Field(default_factory=get_default_excel_path)

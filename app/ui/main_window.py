@@ -18,6 +18,7 @@ from tkinter import filedialog
 
 from app.config.settings import (
     AppConfig,
+    format_int_id,
     load_app_config,
     save_app_config,
     clean_temp_dir,
@@ -356,7 +357,7 @@ class MainWindow(ctk.CTk):
         sec_pill.pack(side="left")
         ctk.CTkLabel(
             sec_pill,
-            text="Zero PII Leak • 100% Offline",
+            text="Data Aman • 100% Offline",
             font=ctk.CTkFont(family=self.theme.font_family_mono, size=11, weight="bold"),
             text_color=THEME["status_ready_text"],
         ).pack(padx=10, pady=5)
@@ -429,10 +430,10 @@ class MainWindow(ctk.CTk):
             border_width=1,
             corner_radius=self.theme.corner_radius_card,
         )
-        self.card_sources.pack(fill="x", pady=(0, 10))
+        self.card_sources.pack(fill="x", pady=(0, 8))
 
         header = ctk.CTkFrame(self.card_sources, fg_color="transparent")
-        header.pack(fill="x", padx=14, pady=(12, 8))
+        header.pack(fill="x", padx=14, pady=(10, 6))
 
         ctk.CTkLabel(
             header,
@@ -451,7 +452,7 @@ class MainWindow(ctk.CTk):
             on_preview=self._generate_preview,
             recheck_label="Cek Ulang",
         )
-        self.doc_row_word.pack(fill="x", padx=12, pady=(0, 8))
+        self.doc_row_word.pack(fill="x", padx=12, pady=(0, 6))
 
         self.doc_row_excel = DocumentSourceRow(
             self.card_sources,
@@ -463,7 +464,7 @@ class MainWindow(ctk.CTk):
             on_map_columns=self._open_column_mapper,
             recheck_label="Scan Ulang",
         )
-        self.doc_row_excel.pack(fill="x", padx=12, pady=(0, 12))
+        self.doc_row_excel.pack(fill="x", padx=12, pady=(0, 8))
 
     def _build_card_kadus(self, parent: ctk.CTkFrame) -> None:
         self.card_kadus = ctk.CTkFrame(
@@ -476,7 +477,7 @@ class MainWindow(ctk.CTk):
         self.card_kadus.pack(fill="both", expand=True)
 
         header = ctk.CTkFrame(self.card_kadus, fg_color="transparent")
-        header.pack(fill="x", padx=14, pady=(12, 8))
+        header.pack(fill="x", padx=14, pady=(10, 6))
 
         ctk.CTkLabel(
             header,
@@ -521,7 +522,7 @@ class MainWindow(ctk.CTk):
         self.btn_deselect_all.pack(side="left")
 
         self.metric_bar = CleanMetricBar(self.card_kadus, self.theme)
-        self.metric_bar.pack(fill="x", padx=12, pady=(0, 8))
+        self.metric_bar.pack(fill="x", padx=12, pady=(0, 6))
 
         self.sheets_scroll_frame = ctk.CTkScrollableFrame(
             self.card_kadus,
@@ -530,7 +531,7 @@ class MainWindow(ctk.CTk):
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
         )
-        self.sheets_scroll_frame.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+        self.sheets_scroll_frame.pack(fill="both", expand=True, padx=12, pady=(0, 6))
 
         self.excel_status_bar = ctk.CTkLabel(
             self.card_kadus,
@@ -539,7 +540,7 @@ class MainWindow(ctk.CTk):
             text_color=THEME["text_muted"],
             anchor="w",
         )
-        self.excel_status_bar.pack(fill="x", padx=14, pady=(0, 10))
+        self.excel_status_bar.pack(fill="x", padx=14, pady=(0, 8))
 
     def _build_card_exec(self, parent: ctk.CTkFrame) -> None:
         self.card_exec = ctk.CTkFrame(
@@ -549,10 +550,10 @@ class MainWindow(ctk.CTk):
             border_width=1,
             corner_radius=self.theme.corner_radius_card,
         )
-        self.card_exec.pack(fill="x", pady=(0, 10))
+        self.card_exec.pack(fill="x", pady=(0, 8))
 
         header = ctk.CTkFrame(self.card_exec, fg_color="transparent")
-        header.pack(fill="x", padx=16, pady=(12, 8))
+        header.pack(fill="x", padx=16, pady=(10, 6))
 
         ctk.CTkLabel(
             header,
@@ -584,7 +585,7 @@ class MainWindow(ctk.CTk):
         self.badge_mailing.pack(side="left")
 
         out_row = ctk.CTkFrame(self.card_exec, fg_color="transparent")
-        out_row.pack(fill="x", padx=16, pady=(0, 8))
+        out_row.pack(fill="x", padx=16, pady=(0, 6))
 
         ctk.CTkLabel(
             out_row,
@@ -642,7 +643,7 @@ class MainWindow(ctk.CTk):
         self.btn_open_output.pack(side="left")
 
         ctrl_row = ctk.CTkFrame(self.card_exec, fg_color="transparent")
-        ctrl_row.pack(fill="x", padx=16, pady=(0, 10))
+        ctrl_row.pack(fill="x", padx=16, pady=(0, 6))
 
         addr_box = ctk.CTkFrame(ctrl_row, fg_color="transparent")
         addr_box.pack(side="left")
@@ -694,7 +695,7 @@ class MainWindow(ctk.CTk):
         self.verify_switch.pack(side="right")
 
         filter_row = ctk.CTkFrame(self.card_exec, fg_color="transparent")
-        filter_row.pack(fill="x", padx=16, pady=(0, 8))
+        filter_row.pack(fill="x", padx=16, pady=(0, 6))
 
         ctk.CTkLabel(
             filter_row,
@@ -757,14 +758,14 @@ class MainWindow(ctk.CTk):
         self.filter_query_entry.bind("<KeyRelease>", self._on_filter_key_release)
 
         self.filter_status_banner = FilterStatusBanner(self.card_exec, theme=self.theme)
-        self.filter_status_banner.pack(fill="x", padx=16, pady=(0, 10))
+        self.filter_status_banner.pack(fill="x", padx=16, pady=(0, 6))
         self.filter_status_banner.set_status(
             "all",
-            "STATUS CETAK: Semua Pemilih • Menunggu berkas DPT Excel",
+            "Siap cetak: Semua pemilih • Menunggu berkas DPT Excel",
         )
 
         btn_action_row = ctk.CTkFrame(self.card_exec, fg_color="transparent")
-        btn_action_row.pack(fill="x", padx=16, pady=(0, 8))
+        btn_action_row.pack(fill="x", padx=16, pady=(0, 6))
 
         self.btn_start = ctk.CTkButton(
             btn_action_row,
@@ -804,10 +805,10 @@ class MainWindow(ctk.CTk):
             border_width=1,
             corner_radius=self.theme.corner_radius_inner,
         )
-        prog_box.pack(fill="x", padx=16, pady=(0, 12))
+        prog_box.pack(fill="x", padx=16, pady=(0, 8))
 
         prog_inner = ctk.CTkFrame(prog_box, fg_color="transparent")
-        prog_inner.pack(fill="x", padx=10, pady=8)
+        prog_inner.pack(fill="x", padx=10, pady=6)
 
         self.progress_bar = ctk.CTkProgressBar(
             prog_inner,
@@ -817,7 +818,7 @@ class MainWindow(ctk.CTk):
             fg_color=THEME["border_card"],
         )
         self.progress_bar.set(0.0)
-        self.progress_bar.pack(fill="x", pady=(0, 6))
+        self.progress_bar.pack(fill="x", pady=(0, 4))
 
         stats_row = ctk.CTkFrame(prog_inner, fg_color="transparent")
         stats_row.pack(fill="x")
@@ -850,7 +851,7 @@ class MainWindow(ctk.CTk):
         self.card_activity.pack(fill="both", expand=True)
 
         header = ctk.CTkFrame(self.card_activity, fg_color="transparent")
-        header.pack(fill="x", padx=16, pady=(12, 8))
+        header.pack(fill="x", padx=16, pady=(10, 6))
 
         ctk.CTkLabel(
             header,
@@ -895,7 +896,7 @@ class MainWindow(ctk.CTk):
         )
 
         self.activity_content_frame = ctk.CTkFrame(self.card_activity, fg_color="transparent")
-        self.activity_content_frame.pack(fill="both", expand=True, padx=14, pady=(0, 10))
+        self.activity_content_frame.pack(fill="both", expand=True, padx=14, pady=(0, 8))
 
         self.voter_table = VoterPreviewTable(self.activity_content_frame, self.theme)
 
@@ -1046,7 +1047,7 @@ class MainWindow(ctk.CTk):
     def _on_filter_changed(self) -> None:
         if not self.excel_scan_result:
             if hasattr(self, "filter_status_banner"):
-                self.filter_status_banner.set_status("all", "STATUS CETAK: Semua Pemilih • Menunggu berkas DPT Excel")
+                self.filter_status_banner.set_status("all", "Siap cetak: Semua pemilih • Menunggu berkas DPT Excel")
             return
 
         filter_mode = self.filter_mode_menu.get().strip()
@@ -1136,25 +1137,25 @@ class MainWindow(ctk.CTk):
                 self.btn_filter_reset.configure(state="disabled")
                 self.filter_status_banner.set_status(
                     "all",
-                    f"STATUS CETAK: Semua Pemilih • Total {total_matched_all:,} Pemilih ({active_kadus_count} Kadus)".replace(",", "."),
+                    f"Siap cetak: Semua pemilih • {format_int_id(total_matched_all)} pemilih ({active_kadus_count} Kadus)",
                 )
             elif not is_query_filled:
                 self.btn_filter_reset.configure(state="normal")
                 self.filter_status_banner.set_status(
                     "empty",
-                    "FILTER BELUM DIISI: Ketik kriteria filter pada kolom di atas untuk menyaring pemilih",
+                    "Ketik kriteria filter pada kolom di atas untuk menyaring pemilih",
                 )
             elif is_filtered and total_matched_all > 0:
                 self.btn_filter_reset.configure(state="normal")
                 self.filter_status_banner.set_status(
                     "active",
-                    f"FILTER DITERAPKAN: [{filter_mode}: {filter_query}] • Menyaring {total_matched_all:,} dari {total_unfiltered:,} Pemilih ({active_kadus_count} Kadus)".replace(",", "."),
+                    f"Siap cetak (terfilter): {format_int_id(total_matched_all)} pemilih cocok dari {active_kadus_count} Kadus [{filter_mode}: {filter_query}]",
                 )
             else:
                 self.btn_filter_reset.configure(state="normal")
                 self.filter_status_banner.set_status(
                     "no_match",
-                    "TIDAK ADA DATA COCOK: 0 pemilih ditemukan untuk filter tersebut. Periksa kembali ketikan Anda",
+                    "Tidak ada data cocok: 0 pemilih ditemukan untuk filter tersebut",
                 )
 
         if self.is_processing:
@@ -1174,13 +1175,13 @@ class MainWindow(ctk.CTk):
             elif total_matched_all > 0:
                 self.btn_start.configure(
                     state="normal",
-                    text=f"Cetak PDF Terfilter ({total_matched_all:,} Pemilih)".replace(",", "."),
+                    text=f"Cetak PDF Terfilter ({format_int_id(total_matched_all)} Pemilih)",
                     fg_color=THEME["btn_primary_bg"],
                     hover_color=THEME["btn_primary_hover"],
                     text_color=THEME["btn_primary_text"],
                 )
                 self.status_detail_label.configure(
-                    text=f"Filter Aktif: {total_matched_all:,} Pemilih Cocok ({active_kadus_count} Kadus)".replace(",", ".")
+                    text=f"Filter Aktif: {format_int_id(total_matched_all)} Pemilih Cocok ({active_kadus_count} Kadus)"
                 )
             else:
                 self.btn_start.configure(
@@ -1195,7 +1196,7 @@ class MainWindow(ctk.CTk):
         else:
             self._check_ready_state()
             self.status_detail_label.configure(
-                text=f"Siap Memproses: 0 / {total_matched_all:,} Pemilih ({active_kadus_count} Kadus)".replace(",", ".")
+                text=f"Siap Memproses: 0 / {format_int_id(total_matched_all)} Pemilih ({active_kadus_count} Kadus)"
             )
 
     def _on_theme_toggled(self, val: str) -> None:
@@ -1590,11 +1591,11 @@ class MainWindow(ctk.CTk):
 
         self.excel_ready = True
         if res.is_valid:
-            status_txt = res.format_status_text if res.format_status_text else f"✓ Siap Mailing • {res.total_sheets} Kadus ({res.total_voters:,} pemilih)"
+            status_txt = res.format_status_text if res.format_status_text else f"✓ Siap Mailing • {res.total_sheets} Kadus ({format_int_id(res.total_voters)} pemilih)"
             if res.is_standard_dpt:
-                status_bar_txt = f"✓ Sesuai Format Standar DPT ({res.total_sheets} Sheet Kadus Seragam • {res.total_voters:,} Pemilih). Zero Error."
+                status_bar_txt = f"✓ Sesuai Format Standar DPT ({res.total_sheets} Sheet Kadus Seragam • {format_int_id(res.total_voters)} Pemilih). Zero Error."
             else:
-                status_bar_txt = f"✓ Format Kustom Terpetakan ({res.total_sheets} Wilayah • {res.total_voters:,} Pemilih). Siap Mailing."
+                status_bar_txt = f"✓ Format Kustom Terpetakan ({res.total_sheets} Wilayah • {format_int_id(res.total_voters)} Pemilih). Siap Mailing."
             self.doc_row_excel.set_status(status_txt, "ready")
             self.excel_status_bar.configure(
                 text=status_bar_txt,
@@ -1972,7 +1973,7 @@ class MainWindow(ctk.CTk):
                     pct = cur / tot if tot > 0 else 0.0
                     self.progress_bar.set(pct)
                     self.status_detail_label.configure(
-                        text=f"Selesai: {cur:,} / {tot:,} Pemilih ({pct * 100:.1f}%) • {sheet}".replace(",", ".")
+                        text=f"Selesai: {format_int_id(cur)} / {format_int_id(tot)} Pemilih ({pct * 100:.1f}%) • {sheet}"
                     )
 
                 elif msg_type == "phase_update":
@@ -2043,9 +2044,9 @@ class MainWindow(ctk.CTk):
                     self.progress_bar.set(1.0)
                     self.time_label.configure(text=f"Waktu Berjalan: {format_elapsed_time(elapsed)} (Selesai)")
                     self.status_detail_label.configure(
-                        text=f"Selesai 100%: {total_v:,} Pemilih ({kadus_count} Kadus)".replace(",", ".")
+                        text=f"Selesai 100%: {format_int_id(total_v)} Pemilih ({kadus_count} Kadus)"
                     )
-                    self._log(f"[SELESAI 100%] Berhasil membuat {kadus_count} file PDF ({total_v:,} pemilih) dalam {format_elapsed_time(elapsed)}.")
+                    self._log(f"[SELESAI 100%] Berhasil membuat {kadus_count} file PDF ({format_int_id(total_v)} pemilih) dalam {format_elapsed_time(elapsed)}.")
                     clean_temp_dir()
 
                     layout_mode = self.word_check_result.layout_mode if self.word_check_result else "2-UP"
@@ -2066,7 +2067,7 @@ class MainWindow(ctk.CTk):
                             solution="Periksa tab 'Hasil Cek PDF' untuk melihat rincian ketidaksesuaian jumlah halaman sebelum mencetak surat fisik.",
                             info_box={
                                 "Wilayah Selesai": f"{kadus_count} Kadus",
-                                "Total Tercetak": f"{total_v:,} Surat ({total_lembar:,} Lembar F4)".replace(",", "."),
+                                "Total Tercetak": f"{format_int_id(total_v)} Surat ({format_int_id(total_lembar)} Lembar F4)",
                                 "Waktu Berjalan": format_elapsed_time(elapsed),
                                 "Status Cek PDF": "Perlu Pemeriksaan Ulang (Ada Selisih)",
                             },
@@ -2081,10 +2082,10 @@ class MainWindow(ctk.CTk):
                             parent=self,
                             variant="success",
                             title="Pembuatan Surat Selesai",
-                            summary=f"Seluruh berkas surat panggilan ({kadus_count} Kadus, {total_v:,} pemilih) berhasil dibuat dan diverifikasi siap cetak.".replace(",", "."),
+                            summary=f"Seluruh berkas surat panggilan ({kadus_count} Kadus, {format_int_id(total_v)} pemilih) berhasil dibuat dan diverifikasi siap cetak.",
                             info_box={
                                 "Wilayah Selesai": f"{kadus_count} Kadus",
-                                "Total Tercetak": f"{total_v:,} Surat ({total_lembar:,} Lembar F4)".replace(",", "."),
+                                "Total Tercetak": f"{format_int_id(total_v)} Surat ({format_int_id(total_lembar)} Lembar F4)",
                                 "Waktu Berjalan": format_elapsed_time(elapsed),
                                 "Status Cek PDF": "Lolos Verifikasi (100% Sesuai)",
                             },

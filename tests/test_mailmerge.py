@@ -1308,10 +1308,10 @@ class TestMailMergeApp(unittest.TestCase):
             self.assertEqual(banner.current_state, "all")
 
             # State 'all'
-            banner.set_status("all", "STATUS CETAK: Semua Pemilih • Total 150 Pemilih (2 Kadus)")
+            banner.set_status("all", "Siap cetak: Semua pemilih • 150 pemilih (2 Kadus)")
             self.assertEqual(banner.current_state, "all")
             self.assertEqual(banner.label_icon.cget("text"), "ℹ")
-            self.assertIn("Semua Pemilih", banner.label_msg.cget("text"))
+            self.assertIn("semua pemilih", banner.label_msg.cget("text").lower())
 
             # State 'empty'
             banner.set_status("empty", "FILTER BELUM DIISI: Ketik kriteria filter")
@@ -1584,8 +1584,8 @@ class TestMailMergeApp(unittest.TestCase):
         import app.ui.components as comp
         import app.ui.modals as modals
 
-        self.assertEqual(__version__, "1.11.1")
-        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.11.1")
+        self.assertEqual(__version__, "1.11.2")
+        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.11.2")
         self.assertEqual(__author__, "Danang Satria")
 
         # Verify modals and helpers exist in modals.py and re-exported in components.py
@@ -1661,48 +1661,53 @@ class TestMailMergeApp(unittest.TestCase):
             validate_version_registry(FEATURE_REGISTRY, current_version="9.9.9")
         self.assertIn("tidak cocok", str(ctx_mismatch.exception))
 
-        # 6. Auto-Updater compatibility: Old versions (1.9.4, 1.10.0, 1.10.4, 1.11.0) detect 1.11.1
-        mock_payload_1_11_1 = {
-            "tag_name": "v1.11.1",
-            "name": "VoterMail Engine v1.11.1",
-            "body": "Rilis Resmi v1.11.1",
+        # 6. Auto-Updater compatibility: Old versions (1.9.4, 1.10.0, 1.10.4, 1.11.0, 1.11.1) detect 1.11.2
+        mock_payload_1_11_2 = {
+            "tag_name": "v1.11.2",
+            "name": "VoterMail Engine v1.11.2",
+            "body": "Rilis Resmi v1.11.2",
             "assets": [
                 {
-                    "name": "VoterMail_Engine_v1.11.1_Windows_x64_Portable.zip",
-                    "browser_download_url": "https://github.com/Smurffahh/votermail-engine/releases/download/v1.11.1/VoterMail_Engine_v1.11.1_Windows_x64_Portable.zip",
+                    "name": "VoterMail_Engine_v1.11.2_Windows_x64_Portable.zip",
+                    "browser_download_url": "https://github.com/Smurffahh/votermail-engine/releases/download/v1.11.2/VoterMail_Engine_v1.11.2_Windows_x64_Portable.zip",
                 }
             ],
-            "html_url": "https://github.com/Smurffahh/votermail-engine/releases/tag/v1.11.1",
+            "html_url": "https://github.com/Smurffahh/votermail-engine/releases/tag/v1.11.2",
         }
         mock_resp = MagicMock()
         mock_resp.status = 200
-        mock_resp.read.return_value = json.dumps(mock_payload_1_11_1).encode("utf-8")
+        mock_resp.read.return_value = json.dumps(mock_payload_1_11_2).encode("utf-8")
         mock_resp.__enter__.return_value = mock_resp
 
         with patch("urllib.request.urlopen", return_value=mock_resp):
             # User from v1.9.4
             res_194 = check_for_updates(current_version="1.9.4")
             self.assertTrue(res_194["update_available"])
-            self.assertEqual(res_194["latest_version"], "1.11.1")
+            self.assertEqual(res_194["latest_version"], "1.11.2")
 
             # User from v1.10.0
             res_1100 = check_for_updates(current_version="1.10.0")
             self.assertTrue(res_1100["update_available"])
-            self.assertEqual(res_1100["latest_version"], "1.11.1")
+            self.assertEqual(res_1100["latest_version"], "1.11.2")
 
             # User from v1.10.4
             res_1104 = check_for_updates(current_version="1.10.4")
             self.assertTrue(res_1104["update_available"])
-            self.assertEqual(res_1104["latest_version"], "1.11.1")
+            self.assertEqual(res_1104["latest_version"], "1.11.2")
 
             # User from v1.11.0
             res_1110 = check_for_updates(current_version="1.11.0")
             self.assertTrue(res_1110["update_available"])
-            self.assertEqual(res_1110["latest_version"], "1.11.1")
+            self.assertEqual(res_1110["latest_version"], "1.11.2")
 
-            # User already on v1.11.1
+            # User from v1.11.1
             res_1111 = check_for_updates(current_version="1.11.1")
-            self.assertFalse(res_1111["update_available"])
+            self.assertTrue(res_1111["update_available"])
+            self.assertEqual(res_1111["latest_version"], "1.11.2")
+
+            # User already on v1.11.2
+            res_1112 = check_for_updates(current_version="1.11.2")
+            self.assertFalse(res_1112["update_available"])
 
             # User on future build v1.12.0
             res_future = check_for_updates(current_version="1.12.0")
@@ -1816,6 +1821,54 @@ class TestMailMergeApp(unittest.TestCase):
                         os.unlink(final_pdf)
                     except Exception:
                         pass
+
+    def test_41_format_int_id_and_layout_proportions(self) -> None:
+        from app.config.settings import format_int_id
+        from app.ui.components import CleanMetricBar, VoterPreviewTable, PREVIEW_COLUMNS_SPEC
+        from app.config.theme import get_theme
+        from app.core.excel_scanner import VoterData
+
+        # 1. format_int_id verification
+        self.assertEqual(format_int_id(None), "0")
+        self.assertEqual(format_int_id(0), "0")
+        self.assertEqual(format_int_id(5), "5")
+        self.assertEqual(format_int_id(3505), "3.505")
+        self.assertEqual(format_int_id(1129), "1.129")
+        self.assertEqual(format_int_id(2257), "2.257")
+        self.assertEqual(format_int_id("1000000"), "1.000.000")
+        self.assertEqual(format_int_id("invalid"), "invalid")
+
+        # 2. UI layout proportions & table columns spec
+        self.assertEqual(len(PREVIEW_COLUMNS_SPEC), 6)
+        col_names = [spec[0] for spec in PREVIEW_COLUMNS_SPEC]
+        self.assertEqual(col_names, [0, 1, 2, 3, 4, 5])
+
+        theme = get_theme("Dark")
+        root = create_test_ctk_root()
+        root.withdraw()
+        try:
+            bar = CleanMetricBar(root, theme=theme)
+            self.assertEqual(bar.cget("height"), 58)
+            bar.update_metrics(5, 3505, 1753)
+            self.assertEqual(bar.lbl_v1.cget("text"), "5 Kadus")
+            self.assertEqual(bar.lbl_v2.cget("text"), "3.505 Orang")
+            self.assertEqual(bar.lbl_v3.cget("text"), "1.753 Lembar F4")
+
+            table = VoterPreviewTable(root, theme=theme)
+            self.assertEqual(table.rows_container.cget("corner_radius"), 0)
+            self.assertEqual(table.rows_container.cget("border_width"), 0)
+
+            sample_voters = [
+                VoterData(nomor="1", nama="Budi Santoso", jenis_kelamin="L", umur="35", alamat="RT 01 RW 01", sheet_name="KADUS 1", wilayah="KADUS 1", row_index=2, extra_fields={}),
+                VoterData(nomor="2", nama="Siti Rahayu", jenis_kelamin="P", umur="28", alamat="RT 02 RW 01", sheet_name="KADUS 1", wilayah="KADUS 1", row_index=3, extra_fields={}),
+            ]
+            table.set_voters(sample_voters, is_filtered=False, total_count=3505)
+            self.assertIn("3.505", table.lbl_status_summary.cget("text"))
+
+            table.set_voters(sample_voters[:1], is_filtered=True, matched_count=1129)
+            self.assertIn("1.129", table.lbl_status_summary.cget("text"))
+        finally:
+            root.destroy()
 
 if __name__ == "__main__":
     unittest.main()

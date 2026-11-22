@@ -10,7 +10,7 @@ import sys
 from typing import Any, Callable, Literal
 import customtkinter as ctk
 
-from app.config.settings import DEFAULT_ADDRESS_FORMAT
+from app.config.settings import DEFAULT_ADDRESS_FORMAT, format_int_id
 from app.config.theme import THEME, ThemeTokens
 from app.config.version import (
     __app_name__,
@@ -235,7 +235,7 @@ class DocumentSourceRow(ctk.CTkFrame):
 
     def _build_ui(self, recheck_label: str) -> None:
         inner = ctk.CTkFrame(self, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=14, pady=10)
+        inner.pack(fill="both", expand=True, padx=12, pady=(6, 6))
 
         top_row = ctk.CTkFrame(inner, fg_color="transparent")
         top_row.pack(fill="x")
@@ -245,6 +245,7 @@ class DocumentSourceRow(ctk.CTkFrame):
             text=self.doc_type,
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
             text_color=THEME["text_secondary"],
+            height=16,
         )
         self.type_label.pack(side="left")
 
@@ -253,6 +254,7 @@ class DocumentSourceRow(ctk.CTkFrame):
             text="• Menunggu pemeriksaan...",
             font=ctk.CTkFont(family=self.theme.font_family_main, size=11, weight="bold"),
             text_color=THEME["text_muted"],
+            height=16,
         )
         self.status_label.pack(side="right")
 
@@ -263,11 +265,12 @@ class DocumentSourceRow(ctk.CTkFrame):
             font=ctk.CTkFont(family=self.theme.font_family_main, size=13, weight="bold"),
             text_color=THEME["text_primary"],
             anchor="w",
+            height=20,
         )
         self.filename_label.pack(fill="x", pady=(2, 4))
 
         self.btn_row = ctk.CTkFrame(inner, fg_color="transparent")
-        self.btn_row.pack(fill="x", pady=(6, 0))
+        self.btn_row.pack(fill="x", pady=(4, 0))
 
         is_word = "word" in self.doc_type.lower()
         browse_text = "Pilih Template Word" if is_word else "Pilih Berkas DPT"
@@ -377,7 +380,7 @@ class CleanMetricBar(ctk.CTkFrame):
             border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=theme.corner_radius_inner,
-            height=62,
+            height=58,
             **kwargs,
         )
         self.theme = theme
@@ -388,67 +391,73 @@ class CleanMetricBar(ctk.CTkFrame):
         self.grid_columnconfigure((0, 2, 4), weight=1)
         self.grid_columnconfigure((1, 3), weight=0)
 
-        m1_box = ctk.CTkFrame(self, fg_color="transparent")
-        m1_box.grid(row=0, column=0, padx=12, pady=8, sticky="nsew")
+        m1_box = ctk.CTkFrame(self, fg_color="transparent", height=44)
+        m1_box.grid(row=0, column=0, padx=8, pady=4, sticky="nsew")
         self.lbl_t1 = ctk.CTkLabel(
             m1_box,
             text="Wilayah terpilih",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
-            text_color=THEME["text_secondary"],
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            text_color=THEME["text_muted"],
+            height=14,
         )
-        self.lbl_t1.pack(anchor="center")
+        self.lbl_t1.pack(anchor="center", pady=(3, 2))
         self.lbl_v1 = ctk.CTkLabel(
             m1_box,
             text="0 Kadus",
-            font=ctk.CTkFont(family=self.theme.font_family_mono, size=16, weight="bold"),
+            font=ctk.CTkFont(family=self.theme.font_family_mono, size=15, weight="bold"),
             text_color=THEME["metric_value"],
+            height=20,
         )
         self.lbl_v1.pack(anchor="center")
 
-        div1 = ctk.CTkFrame(self, fg_color=THEME["border_surface"], width=1)
-        div1.grid(row=0, column=1, sticky="ns", pady=8)
+        div1 = ctk.CTkFrame(self, fg_color=THEME["border_surface"], width=1, height=36)
+        div1.grid(row=0, column=1, sticky="ns", pady=10)
 
-        m2_box = ctk.CTkFrame(self, fg_color="transparent")
-        m2_box.grid(row=0, column=2, padx=12, pady=8, sticky="nsew")
+        m2_box = ctk.CTkFrame(self, fg_color="transparent", height=44)
+        m2_box.grid(row=0, column=2, padx=8, pady=4, sticky="nsew")
         self.lbl_t2 = ctk.CTkLabel(
             m2_box,
             text="Total pemilih",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
-            text_color=THEME["text_secondary"],
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            text_color=THEME["text_muted"],
+            height=14,
         )
-        self.lbl_t2.pack(anchor="center")
+        self.lbl_t2.pack(anchor="center", pady=(3, 2))
         self.lbl_v2 = ctk.CTkLabel(
             m2_box,
             text="0 Orang",
-            font=ctk.CTkFont(family=self.theme.font_family_mono, size=16, weight="bold"),
+            font=ctk.CTkFont(family=self.theme.font_family_mono, size=15, weight="bold"),
             text_color=THEME["metric_value"],
+            height=20,
         )
         self.lbl_v2.pack(anchor="center")
 
-        div2 = ctk.CTkFrame(self, fg_color=THEME["border_surface"], width=1)
-        div2.grid(row=0, column=3, sticky="ns", pady=8)
+        div2 = ctk.CTkFrame(self, fg_color=THEME["border_surface"], width=1, height=36)
+        div2.grid(row=0, column=3, sticky="ns", pady=10)
 
-        m3_box = ctk.CTkFrame(self, fg_color="transparent")
-        m3_box.grid(row=0, column=4, padx=12, pady=8, sticky="nsew")
+        m3_box = ctk.CTkFrame(self, fg_color="transparent", height=44)
+        m3_box.grid(row=0, column=4, padx=8, pady=4, sticky="nsew")
         self.lbl_t3 = ctk.CTkLabel(
             m3_box,
             text="Kebutuhan kertas",
-            font=ctk.CTkFont(family=self.theme.font_family_main, size=10, weight="bold"),
-            text_color=THEME["text_secondary"],
+            font=ctk.CTkFont(family=self.theme.font_family_main, size=11),
+            text_color=THEME["text_muted"],
+            height=14,
         )
-        self.lbl_t3.pack(anchor="center")
+        self.lbl_t3.pack(anchor="center", pady=(3, 2))
         self.lbl_v3 = ctk.CTkLabel(
             m3_box,
             text="0 Lembar F4",
-            font=ctk.CTkFont(family=self.theme.font_family_mono, size=16, weight="bold"),
+            font=ctk.CTkFont(family=self.theme.font_family_mono, size=15, weight="bold"),
             text_color=THEME["metric_value"],
+            height=20,
         )
         self.lbl_v3.pack(anchor="center")
 
     def update_metrics(self, kadus_count: int, total_voters: int, total_pages: int) -> None:
-        self.lbl_v1.configure(text=f"{kadus_count:,} Kadus")
-        self.lbl_v2.configure(text=f"{total_voters:,} Orang")
-        self.lbl_v3.configure(text=f"{total_pages:,} Lembar F4")
+        self.lbl_v1.configure(text=f"{format_int_id(kadus_count)} Kadus")
+        self.lbl_v2.configure(text=f"{format_int_id(total_voters)} Orang")
+        self.lbl_v3.configure(text=f"{format_int_id(total_pages)} Lembar F4")
 
     def update_theme(self, theme: ThemeTokens) -> None:
         pass
@@ -473,7 +482,7 @@ class KadusRowItem(ctk.CTkFrame):
             border_color=THEME["border_surface"],
             border_width=1,
             corner_radius=theme.corner_radius_inner,
-            height=40,
+            height=36,
             **kwargs,
         )
         self.theme = theme
@@ -497,18 +506,18 @@ class KadusRowItem(ctk.CTkFrame):
             corner_radius=4,
             width=140,
         )
-        self.checkbox.pack(side="left", padx=(12, 6), pady=6)
+        self.checkbox.pack(side="left", padx=(10, 6), pady=4)
 
         self.info_label = ctk.CTkLabel(
             self,
-            text=f"{voter_count:,} Pemilih  •  {page_count:,} Lembar",
+            text=f"{format_int_id(voter_count)} Pemilih  •  {format_int_id(page_count)} Lembar",
             font=ctk.CTkFont(family=theme.font_family_mono, size=11),
             text_color=THEME["text_secondary"],
         )
-        self.info_label.pack(side="left", padx=8)
+        self.info_label.pack(side="left", padx=6)
 
         self.right_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.right_frame.pack(side="right", padx=(4, 12))
+        self.right_frame.pack(side="right", padx=(4, 10))
 
         self.btn_open_pdf = ctk.CTkButton(
             self.right_frame,
@@ -574,16 +583,16 @@ class KadusRowItem(ctk.CTkFrame):
 
     def update_filter_stats(self, matched_count: int, matched_pages: int, is_filter_active: bool) -> None:
         if not is_filter_active:
-            self.info_label.configure(text=f"{self.voter_count:,} Pemilih  •  {self.page_count:,} Lembar")
+            self.info_label.configure(text=f"{format_int_id(self.voter_count)} Pemilih  •  {format_int_id(self.page_count)} Lembar")
             self.status_label.configure(text="• Siap", text_color=THEME["status_ready_text"])
             self.checkbox.configure(state="normal")
         else:
             if matched_count > 0:
-                self.info_label.configure(text=f"{matched_count:,} / {self.voter_count:,} Pemilih  •  {matched_pages:,} Lembar")
-                self.status_label.configure(text=f"• {matched_count:,} Cocok", text_color=THEME["status_ready_text"])
+                self.info_label.configure(text=f"{format_int_id(matched_count)} / {format_int_id(self.voter_count)} Pemilih  •  {format_int_id(matched_pages)} Lembar")
+                self.status_label.configure(text=f"• {format_int_id(matched_count)} Cocok", text_color=THEME["status_ready_text"])
                 self.checkbox.configure(state="normal")
             else:
-                self.info_label.configure(text=f"0 / {self.voter_count:,} Pemilih  •  0 Lembar")
+                self.info_label.configure(text=f"0 / {format_int_id(self.voter_count)} Pemilih  •  0 Lembar")
                 self.status_label.configure(text="• Dilewati", text_color=THEME["text_muted"])
 
     def update_theme(self, theme: ThemeTokens) -> None:
@@ -591,6 +600,15 @@ class KadusRowItem(ctk.CTkFrame):
 
 # Alias for backwards compatibility
 KadusItemRow = KadusRowItem
+
+PREVIEW_COLUMNS_SPEC = (
+    (0, {"weight": 0, "minsize": 44}),
+    (1, {"weight": 2, "minsize": 175}),
+    (2, {"weight": 0, "minsize": 96}),
+    (3, {"weight": 0, "minsize": 82}),
+    (4, {"weight": 4, "minsize": 240}),
+    (5, {"weight": 0, "minsize": 92}),
+)
 
 class VoterPreviewTable(ctk.CTkFrame):
     """Tabel pratinjau data pemilih yang telah ditransformasikan dengan tata letak monospace terstruktur."""
@@ -615,12 +633,8 @@ class VoterPreviewTable(ctk.CTkFrame):
         self._build_ui()
 
     def _configure_grid_columns(self, frame: ctk.CTkFrame) -> None:
-        frame.grid_columnconfigure(0, weight=0, minsize=48)
-        frame.grid_columnconfigure(1, weight=2, minsize=190)
-        frame.grid_columnconfigure(2, weight=0, minsize=95)
-        frame.grid_columnconfigure(3, weight=0, minsize=90)
-        frame.grid_columnconfigure(4, weight=4)
-        frame.grid_columnconfigure(5, weight=0, minsize=100)
+        for col_idx, spec in PREVIEW_COLUMNS_SPEC:
+            frame.grid_columnconfigure(col_idx, **spec)
 
     def _build_ui(self) -> None:
         self.status_bar = ctk.CTkFrame(
@@ -723,11 +737,13 @@ class VoterPreviewTable(ctk.CTkFrame):
         self.rows_container = ctk.CTkScrollableFrame(
             self,
             fg_color="transparent",
+            corner_radius=0,
+            border_width=0,
             scrollbar_fg_color="transparent",
             scrollbar_button_color=THEME["bg_elevated"],
             scrollbar_button_hover_color=THEME["border_surface"],
         )
-        self.rows_container.pack(fill="both", expand=True, padx=10, pady=(0, 8))
+        self.rows_container.pack(fill="both", expand=True, padx=10, pady=(0, 6))
 
         self._render_rows()
 
@@ -772,7 +788,7 @@ class VoterPreviewTable(ctk.CTkFrame):
             if matched > 0:
                 self.lbl_status_indicator.configure(text="•", text_color=THEME["status_info_text"])
                 self.lbl_status_summary.configure(
-                    text=f"Pratinjau Filter: Menampilkan {shown_count} dari {matched:,} Pemilih Cocok".replace(",", ".")
+                    text=f"Pratinjau Filter: Menampilkan {shown_count} dari {format_int_id(matched)} Pemilih Cocok"
                 )
             else:
                 self.lbl_status_indicator.configure(text="•", text_color=THEME["status_error_text"])
@@ -782,7 +798,7 @@ class VoterPreviewTable(ctk.CTkFrame):
                 tot = self.total_count if (self.total_count is not None and self.total_count > 0) else len(self.cached_voters)
                 self.lbl_status_indicator.configure(text="•", text_color=THEME["status_ready_text"])
                 self.lbl_status_summary.configure(
-                    text=f"Pratinjau Sampel: Menampilkan {shown_count} dari {tot:,} Pemilih".replace(",", ".")
+                    text=f"Pratinjau Sampel: Menampilkan {shown_count} dari {format_int_id(tot)} Pemilih"
                 )
             else:
                 self.lbl_status_indicator.configure(text="•", text_color=THEME["text_muted"])
@@ -841,9 +857,9 @@ class VoterPreviewTable(ctk.CTkFrame):
                 border_color=border_col,
                 border_width=border_w,
                 corner_radius=6,
-                height=34,
+                height=32,
             )
-            row_frame.pack(fill="x", padx=2, pady=2)
+            row_frame.pack(fill="x", padx=0, pady=2)
             self._configure_grid_columns(row_frame)
 
             def _bind_hover(target: Any, target_row: ctk.CTkFrame, default_bg: Any) -> None:
@@ -869,7 +885,7 @@ class VoterPreviewTable(ctk.CTkFrame):
                 text_color=THEME["text_muted"],
                 anchor="w",
             )
-            lbl_no.grid(row=0, column=0, padx=(10, 4), pady=5, sticky="w")
+            lbl_no.grid(row=0, column=0, padx=(10, 4), pady=4, sticky="w")
             _bind_hover(lbl_no, row_frame, bg_col)
 
             lbl_nama = ctk.CTkLabel(
@@ -879,7 +895,7 @@ class VoterPreviewTable(ctk.CTkFrame):
                 text_color=THEME["text_primary"],
                 anchor="w",
             )
-            lbl_nama.grid(row=0, column=1, padx=4, pady=5, sticky="w")
+            lbl_nama.grid(row=0, column=1, padx=4, pady=4, sticky="w")
             _bind_hover(lbl_nama, row_frame, bg_col)
 
             jk_raw = voter.jenis_kelamin.strip().upper()
@@ -897,7 +913,7 @@ class VoterPreviewTable(ctk.CTkFrame):
                 text_color=THEME["text_secondary"],
                 anchor="w",
             )
-            lbl_jk.grid(row=0, column=2, padx=4, pady=5, sticky="w")
+            lbl_jk.grid(row=0, column=2, padx=4, pady=4, sticky="w")
             _bind_hover(lbl_jk, row_frame, bg_col)
 
             umur_val = str(voter.umur).strip()
@@ -913,7 +929,7 @@ class VoterPreviewTable(ctk.CTkFrame):
                 text_color=THEME["text_secondary"],
                 anchor="w",
             )
-            lbl_umur.grid(row=0, column=3, padx=4, pady=5, sticky="w")
+            lbl_umur.grid(row=0, column=3, padx=4, pady=4, sticky="w")
             _bind_hover(lbl_umur, row_frame, bg_col)
 
             display_addr = build_voter_address(voter, self.cached_address_format) if self.cached_address_format else voter.alamat
@@ -924,7 +940,7 @@ class VoterPreviewTable(ctk.CTkFrame):
                 text_color=THEME["text_secondary"],
                 anchor="w",
             )
-            lbl_addr.grid(row=0, column=4, padx=4, pady=5, sticky="ew")
+            lbl_addr.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
             _bind_hover(lbl_addr, row_frame, bg_col)
 
             wilayah_name = voter.sheet_name.strip() if voter.sheet_name else "KADUS 1"
@@ -936,7 +952,7 @@ class VoterPreviewTable(ctk.CTkFrame):
                 corner_radius=4,
                 height=22,
             )
-            badge.grid(row=0, column=5, padx=(4, 10), pady=5, sticky="e")
+            badge.grid(row=0, column=5, padx=(4, 10), pady=4, sticky="e")
             _bind_hover(badge, row_frame, bg_col)
 
             badge_lbl = ctk.CTkLabel(

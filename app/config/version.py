@@ -191,6 +191,18 @@ FEATURE_REGISTRY: list[dict[str, Any]] = [
             "Pembersihan otomatis elemen shape hantu tanpa isi/fill/stroke pada pipeline template.",
         ],
     },
+    {
+        "version": "1.11.2",
+        "date": "2026-11-22",
+        "title": "Optimasi Tata Letak Dashboard, Penyelarasan Kolom Pratinjau, & Pemformatan Angka Titik Indonesia",
+        "description": "Pengurangan tinggi bar metrik wilayah dan ekspansi daftar dusun hingga 5 baris tanpa scroll, penyelarasan presisi kolom VoterPreviewTable, pemformatan angka ribuan titik Indonesia (3.505), serta humanisasi teks operasional.",
+        "highlights": [
+            "Pengurangan tinggi CleanMetricBar menjadi 58px dan ekspansi daftar Kadus agar seluruh 5 baris langsung terlihat tanpa scroll.",
+            "Penyelarasan grid dan eliminasi offset 6px pada VoterPreviewTable sehingga judul kolom lurus sempurna dengan baris data.",
+            "Penerapan format angka ribuan dengan pemisah titik (3.505 pemilih) di seluruh antarmuka dashboard dan modal konfirmasi.",
+            "Humanisasi teks status cetak dan badge keamanan 'Data Aman • 100% Offline' tanpa kata serba kapital berlebih.",
+        ],
+    },
 ]
 
 def get_latest_release_entry() -> dict[str, Any]:
