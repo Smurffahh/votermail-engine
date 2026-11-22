@@ -216,6 +216,16 @@ FEATURE_REGISTRY: list[dict[str, Any]] = [
             "Atomic backup dan rollback otomatis jika proses penimpaan file gagal serta proteksi 100% data pemilih dan template.",
         ],
     },
+    {
+        "version": "1.12.1",
+        "date": "2026-11-22",
+        "title": "Hardening In-Place Patch Updater untuk Kompatibilitas Flashdisk Lintas Drive",
+        "description": "Penguatan arsitektur auto-updater saat aplikasi dijalankan dari media penyimpanan eksternal/flashdisk lintas drive (NTFS ke FAT32/exFAT), proteksi file Read-Only, isolasi folder berkurung siku, dan penanganan graceful saat media terkunci.",
+        "highlights": [
+            "Penguatan kompatibilitas Auto-Updater untuk media flashdisk/eksternal lintas drive (NTFS ke FAT32/exFAT) menggunakan Copy-Item -LiteralPath -Force pada seluruh fase backup, pemasangan patch, dan auto-rollback.",
+            "Penambahan penanganan aman untuk nama folder berkarakter kurung siku, file beratribut Read-Only, serta pesan pemulihan otomatis jika flashdisk penuh atau terkunci.",
+        ],
+    },
 ]
 
 def get_latest_release_entry() -> dict[str, Any]:

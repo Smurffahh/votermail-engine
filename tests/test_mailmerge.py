@@ -1584,8 +1584,8 @@ class TestMailMergeApp(unittest.TestCase):
         import app.ui.components as comp
         import app.ui.modals as modals
 
-        self.assertEqual(__version__, "1.12.0")
-        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.12.0")
+        self.assertEqual(__version__, "1.12.1")
+        self.assertEqual(FEATURE_REGISTRY[-1]["version"], "1.12.1")
         self.assertEqual(__author__, "Danang Satria")
 
         # Verify modals and helpers exist in modals.py and re-exported in components.py
@@ -1661,58 +1661,63 @@ class TestMailMergeApp(unittest.TestCase):
             validate_version_registry(FEATURE_REGISTRY, current_version="9.9.9")
         self.assertIn("tidak cocok", str(ctx_mismatch.exception))
 
-        # 6. Auto-Updater compatibility: Old versions (1.9.4, 1.10.0, 1.10.4, 1.11.0, 1.11.1, 1.11.2) detect 1.12.0
-        mock_payload_1_12_0 = {
-            "tag_name": "v1.12.0",
-            "name": "VoterMail Engine v1.12.0",
-            "body": "Rilis Resmi v1.12.0",
+        # 6. Auto-Updater compatibility: Old versions (1.9.4, 1.10.0, 1.10.4, 1.11.0, 1.11.1, 1.11.2, 1.12.0) detect 1.12.1
+        mock_payload_1_12_1 = {
+            "tag_name": "v1.12.1",
+            "name": "VoterMail Engine v1.12.1",
+            "body": "Rilis Resmi v1.12.1",
             "assets": [
                 {
-                    "name": "VoterMail_Engine_v1.12.0_Windows_x64_Portable.zip",
-                    "browser_download_url": "https://github.com/Smurffahh/votermail-engine/releases/download/v1.12.0/VoterMail_Engine_v1.12.0_Windows_x64_Portable.zip",
+                    "name": "VoterMail_Engine_v1.12.1_Windows_x64_Portable.zip",
+                    "browser_download_url": "https://github.com/Smurffahh/votermail-engine/releases/download/v1.12.1/VoterMail_Engine_v1.12.1_Windows_x64_Portable.zip",
                 }
             ],
-            "html_url": "https://github.com/Smurffahh/votermail-engine/releases/tag/v1.12.0",
+            "html_url": "https://github.com/Smurffahh/votermail-engine/releases/tag/v1.12.1",
         }
         mock_resp = MagicMock()
         mock_resp.status = 200
-        mock_resp.read.return_value = json.dumps(mock_payload_1_12_0).encode("utf-8")
+        mock_resp.read.return_value = json.dumps(mock_payload_1_12_1).encode("utf-8")
         mock_resp.__enter__.return_value = mock_resp
 
         with patch("urllib.request.urlopen", return_value=mock_resp):
             # User from v1.9.4
             res_194 = check_for_updates(current_version="1.9.4")
             self.assertTrue(res_194["update_available"])
-            self.assertEqual(res_194["latest_version"], "1.12.0")
+            self.assertEqual(res_194["latest_version"], "1.12.1")
 
             # User from v1.10.0
             res_1100 = check_for_updates(current_version="1.10.0")
             self.assertTrue(res_1100["update_available"])
-            self.assertEqual(res_1100["latest_version"], "1.12.0")
+            self.assertEqual(res_1100["latest_version"], "1.12.1")
 
             # User from v1.10.4
             res_1104 = check_for_updates(current_version="1.10.4")
             self.assertTrue(res_1104["update_available"])
-            self.assertEqual(res_1104["latest_version"], "1.12.0")
+            self.assertEqual(res_1104["latest_version"], "1.12.1")
 
             # User from v1.11.0
             res_1110 = check_for_updates(current_version="1.11.0")
             self.assertTrue(res_1110["update_available"])
-            self.assertEqual(res_1110["latest_version"], "1.12.0")
+            self.assertEqual(res_1110["latest_version"], "1.12.1")
 
             # User from v1.11.1
             res_1111 = check_for_updates(current_version="1.11.1")
             self.assertTrue(res_1111["update_available"])
-            self.assertEqual(res_1111["latest_version"], "1.12.0")
+            self.assertEqual(res_1111["latest_version"], "1.12.1")
 
             # User from v1.11.2
             res_1112 = check_for_updates(current_version="1.11.2")
             self.assertTrue(res_1112["update_available"])
-            self.assertEqual(res_1112["latest_version"], "1.12.0")
+            self.assertEqual(res_1112["latest_version"], "1.12.1")
 
-            # User already on v1.12.0
+            # User from v1.12.0
             res_1120 = check_for_updates(current_version="1.12.0")
-            self.assertFalse(res_1120["update_available"])
+            self.assertTrue(res_1120["update_available"])
+            self.assertEqual(res_1120["latest_version"], "1.12.1")
+
+            # User already on v1.12.1
+            res_1121 = check_for_updates(current_version="1.12.1")
+            self.assertFalse(res_1121["update_available"])
 
             # User on future build v1.13.0
             res_future = check_for_updates(current_version="1.13.0")
@@ -2044,6 +2049,86 @@ class TestMailMergeApp(unittest.TestCase):
         # 6. Verify MainWindow shutdown methods exist
         self.assertTrue(hasattr(MainWindow, "_prepare_shutdown_for_update"))
         self.assertTrue(hasattr(MainWindow, "_shutdown_and_exit_for_update"))
+
+    def test_43_cross_drive_flashdisk_updater_hardening(self) -> None:
+        import json
+        import subprocess
+        import tempfile
+        from unittest.mock import patch
+        from app.core.updater import generate_patch_script, launch_detached_patcher
+
+        with tempfile.TemporaryDirectory() as td:
+            ps1_path = generate_patch_script(td)
+            self.assertTrue(ps1_path.exists())
+            ps1_text = ps1_path.read_text(encoding="ascii")
+
+            # 1. Assert Copy-Item with -LiteralPath and -Force on all 3 phases (Backup, Apply, Rollback)
+            self.assertIn("Copy-Item -LiteralPath $targetFile -Destination $backupTarget -Force", ps1_text)
+            self.assertIn("Copy-Item -LiteralPath $f.FullName -Destination $targetFile -Force", ps1_text)
+            self.assertIn("Copy-Item -LiteralPath $bSrc -Destination $tDst -Force", ps1_text)
+
+            # 2. Assert Move-Item is NOT used anywhere
+            self.assertNotIn("Move-Item", ps1_text)
+
+            # 3. Assert ReadOnly clearing logic exists for target file and rollback destination
+            self.assertIn("(Get-Item -LiteralPath $targetFile -Force).IsReadOnly = $false", ps1_text)
+            self.assertIn("(Get-Item -LiteralPath $tDst -Force).IsReadOnly = $false", ps1_text)
+
+            # 4. Assert friendly storage error message for write-protected or full storage
+            expected_msg = "Pembaruan dibatalkan karena media penyimpanan penuh atau terkunci (write-protected). Versi sebelumnya telah dipulihkan."
+            self.assertIn(expected_msg, ps1_text)
+
+            # 5. Assert pure ASCII and CRLF line endings
+            raw_bytes = ps1_path.read_bytes()
+            self.assertTrue(all(b < 128 for b in raw_bytes))
+            self.assertIn(b"\r\n", raw_bytes)
+            self.assertNotIn(b"\n", raw_bytes.replace(b"\r\n", b""))
+
+            # 6. Validate PowerShell syntax via AST parser
+            ps_cmd = [
+                "powershell.exe",
+                "-NoProfile",
+                "-Command",
+                f"$errs = $null; [System.Management.Automation.Language.Parser]::ParseFile('{str(ps1_path)}', [ref]$null, [ref]$errs); if ($errs.Count -gt 0) {{ $errs | ForEach-Object {{ Write-Error $_.Message }}; exit 1 }} else {{ exit 0 }}",
+            ]
+            res_ps = subprocess.run(ps_cmd, capture_output=True, text=True)
+            self.assertEqual(res_ps.returncode, 0, f"PowerShell AST syntax error: {res_ps.stderr}")
+
+            # 7. Simulation of bracketed path on flash drive (e.g. F:\Pilkades [2026]\VoterMail_Engine)
+            bracket_app_dir = r"F:\Pilkades [2026]\VoterMail_Engine"
+            bracket_exe = r"F:\Pilkades [2026]\VoterMail_Engine\VoterMail_Engine.exe"
+            staging_d = Path(td) / "staging"
+            staging_d.mkdir(parents=True, exist_ok=True)
+            backup_d = Path(td) / "backup"
+
+            with patch("subprocess.Popen") as mock_popen:
+                ok, msg = launch_detached_patcher(
+                    parent_pid=9999,
+                    app_dir=bracket_app_dir,
+                    exe_path=bracket_exe,
+                    staging_dir=staging_d,
+                    backup_dir=backup_d,
+                    update_mode="PATCH",
+                    target_version="1.12.1",
+                )
+                self.assertTrue(ok, f"Launch failed: {msg}")
+                self.assertTrue(mock_popen.called)
+
+            job_json = Path(td) / "patch_job.json"
+            self.assertTrue(job_json.exists())
+            job_data = json.loads(job_json.read_text(encoding="utf-8"))
+            self.assertIn("[2026]", job_data["app_dir"])
+            self.assertIn("[2026]", job_data["exe_path"])
+
+            # Verify PowerShell ConvertFrom-Json parses the bracketed path correctly
+            ps_json_test = [
+                "powershell.exe",
+                "-NoProfile",
+                "-Command",
+                f"$raw = [System.IO.File]::ReadAllText('{str(job_json)}', [System.Text.Encoding]::UTF8); $j = $raw | ConvertFrom-Json; if ($j.app_dir -like '*[2026]*') {{ exit 0 }} else {{ exit 1 }}",
+            ]
+            res_json = subprocess.run(ps_json_test, capture_output=True, text=True)
+            self.assertEqual(res_json.returncode, 0, "PowerShell failed to parse bracketed path JSON")
 
 if __name__ == "__main__":
     unittest.main()
